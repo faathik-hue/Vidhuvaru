@@ -1,0 +1,2726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Vidhuvaru — Family Finance</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#0e4a47" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Vidhuvaru" />
+<meta name="description" content="Vidhuvaru — family finance tracker for 6 members across two homes" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+
+<!-- Microsoft Authentication Library -->
+<script src="https://alcdn.msauth.net/browser/2.38.4/js/msal-browser.min.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f1ea;
+    --bg-2: #ebe5db;
+    --card: #ffffff;
+    --ink: #1a2231;
+    --ink-2: #4a5568;
+    --muted: #8b8f9a;
+    --line: #e8e2d6;
+    --line-2: #d8d2c4;
+    --primary: #0e4a47;
+    --primary-2: #0a3a37;
+    --primary-soft: #d6e7e3;
+    --accent: #c08454;
+    --accent-soft: #f3e3d2;
+    --success: #2a6e54;
+    --success-soft: #d8ebde;
+    --danger: #a93a3a;
+    --danger-soft: #f3dada;
+    --warn: #b67a1d;
+    --warn-soft: #f5e6c8;
+    --shadow-sm: 0 1px 2px rgba(26,34,49,0.04), 0 1px 3px rgba(26,34,49,0.03);
+    --shadow: 0 2px 8px rgba(26,34,49,0.05), 0 1px 3px rgba(26,34,49,0.04);
+    --shadow-lg: 0 8px 28px rgba(26,34,49,0.08), 0 4px 12px rgba(26,34,49,0.04);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --radius-lg: 22px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+  }
+
+  /* ---------- App shell ---------- */
+  #app {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding-bottom: 88px;
+    position: relative;
+  }
+  .screen { display: none; padding: 0 18px; animation: fadeUp .35s ease both; }
+  .screen.active { display: block; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- Top header ---------- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 4px 18px;
+  }
+  .topbar .greeting { line-height: 1.15; }
+  .topbar .hello { color: var(--muted); font-size: 13px; font-weight: 500; letter-spacing: 0.02em; }
+  .topbar .name { font-family: 'Fraunces', serif; font-size: 26px; font-weight: 500; letter-spacing: -0.01em; }
+  .avatar {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    display: grid; place-items: center;
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 17px;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ---------- Headline / hero card ---------- */
+  .hero {
+    background: var(--ink);
+    color: #f5f1ea;
+    border-radius: var(--radius-lg);
+    padding: 22px 22px 22px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(80% 60% at 100% 0%, rgba(192,132,84,0.25), transparent 60%),
+                radial-gradient(60% 60% at 0% 100%, rgba(14,74,71,0.6), transparent 60%);
+    pointer-events: none;
+  }
+  .hero .label {
+    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: rgba(245,241,234,0.6); font-weight: 600;
+  }
+  .hero .value {
+    font-family: 'Fraunces', serif;
+    font-size: 36px; font-weight: 500;
+    margin-top: 6px; letter-spacing: -0.02em;
+    line-height: 1.05;
+  }
+  .hero .value .cur { font-size: 16px; opacity: .55; font-weight: 500; margin-right: 4px; }
+  .hero .sub { display: flex; gap: 16px; margin-top: 18px; font-size: 13px; color: rgba(245,241,234,0.75); }
+  .hero .sub .item { display: flex; flex-direction: column; gap: 2px; }
+  .hero .sub .item .k { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(245,241,234,0.55); }
+  .hero .sub .item .v { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; }
+  .hero .sub .item .v.pos { color: #b7e0c5; }
+  .hero .sub .item .v.neg { color: #f1baba; }
+
+  /* ---------- Section titles ---------- */
+  .section-title {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin: 26px 4px 12px;
+  }
+  .section-title h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 19px; font-weight: 500;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .section-title a {
+    color: var(--primary); font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+
+  /* ---------- Cards ---------- */
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--line);
+  }
+  .card + .card { margin-top: 10px; }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px;
+  }
+  .stat .k { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .stat .v { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 500; margin-top: 4px; letter-spacing: -0.01em; }
+  .stat .v.small { font-size: 18px; }
+  .stat.tinted { background: var(--primary-soft); border-color: transparent; }
+  .stat.tinted .v { color: var(--primary); }
+  .stat.tinted.gold { background: var(--accent-soft); }
+  .stat.tinted.gold .v { color: var(--accent); }
+  .stat.tinted.green { background: var(--success-soft); }
+  .stat.tinted.green .v { color: var(--success); }
+  .stat.tinted.red { background: var(--danger-soft); }
+  .stat.tinted.red .v { color: var(--danger); }
+
+  /* ---------- List rows ---------- */
+  .row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+  }
+  .row:first-child { border-top: none; }
+  .row .icon {
+    width: 38px; height: 38px; border-radius: 12px;
+    background: var(--bg-2);
+    display: grid; place-items: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .row .body { flex: 1; min-width: 0; }
+  .row .body .t { font-weight: 600; font-size: 14px; line-height: 1.3; }
+  .row .body .s { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .row .amt { font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .row .amt.neg { color: var(--danger); }
+  .row .amt.pos { color: var(--success); }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    appearance: none; border: none; cursor: pointer;
+    font-family: inherit; font-weight: 600; font-size: 14px;
+    padding: 13px 18px; border-radius: 12px;
+    transition: transform .1s ease, opacity .15s ease;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-2); }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
+  .btn-soft { background: var(--bg-2); color: var(--ink); }
+  .btn-danger { background: var(--danger-soft); color: var(--danger); }
+  .btn-block { display: flex; width: 100%; }
+  .btn-lg { padding: 16px 22px; font-size: 15px; }
+
+  /* ---------- Inputs ---------- */
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: var(--ink-2); margin-bottom: 6px;
+    letter-spacing: 0.02em;
+  }
+  .field input, .field select, .field textarea {
+    width: 100%;
+    appearance: none;
+    font-family: inherit;
+    font-size: 15px;
+    padding: 13px 14px;
+    border: 1px solid var(--line-2);
+    border-radius: 12px;
+    background: white;
+    color: var(--ink);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(14,74,71,0.1);
+  }
+  .field textarea { min-height: 70px; resize: vertical; font-family: inherit; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row > .field { flex: 1; }
+
+  /* ---------- Bottom nav ---------- */
+  .nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    max-width: 480px; margin: 0 auto;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--line);
+    display: flex; padding: 10px 6px 14px;
+    z-index: 50;
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    gap: 3px; padding: 6px 4px; cursor: pointer;
+    color: var(--muted); font-size: 10.5px; font-weight: 600;
+    transition: color .15s ease;
+  }
+  .nav-item svg { width: 22px; height: 22px; stroke-width: 1.7; }
+  .nav-item.active { color: var(--primary); }
+
+  /* ---------- FAB ---------- */
+  .fab {
+    position: fixed; bottom: 88px; right: 50%;
+    transform: translateX(228px);
+    width: 54px; height: 54px; border-radius: 50%;
+    background: var(--ink); color: white;
+    display: grid; place-items: center;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(26,34,49,0.25), 0 4px 8px rgba(26,34,49,0.15);
+    z-index: 40;
+    transition: transform .15s ease;
+  }
+  .fab:active { transform: translateX(228px) scale(0.92); }
+  .fab svg { width: 24px; height: 24px; }
+  @media (max-width: 510px) {
+    .fab { right: 20px; transform: none; }
+    .fab:active { transform: scale(0.92); }
+  }
+
+  /* ---------- Login / Setup screen ---------- */
+  .auth-screen {
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    padding: 0 22px;
+    background: linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+  }
+  .auth-screen.active { display: flex; }
+  .auth-brand {
+    padding: 60px 0 36px;
+    text-align: center;
+  }
+  .auth-brand .logo {
+    width: 64px; height: 64px;
+    border-radius: 18px;
+    background: var(--ink); color: var(--accent);
+    margin: 0 auto 18px;
+    display: grid; place-items: center;
+    font-family: 'Fraunces', serif;
+    font-size: 32px; font-weight: 500;
+    box-shadow: var(--shadow-lg);
+  }
+  .auth-brand h1 {
+    font-family: 'Fraunces', serif;
+    font-size: 34px; font-weight: 500;
+    letter-spacing: -0.02em; margin: 0;
+  }
+  .auth-brand p {
+    color: var(--muted); margin: 8px 0 0;
+    font-size: 14px;
+  }
+  .member-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .member-tile {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px 14px;
+    text-align: center; cursor: pointer;
+    transition: transform .15s ease, border-color .15s ease;
+  }
+  .member-tile:active { transform: scale(0.97); }
+  .member-tile:hover { border-color: var(--primary); }
+  .member-tile .ring {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-family: 'Fraunces', serif;
+    font-size: 20px; font-weight: 500;
+    margin: 0 auto 10px;
+    display: grid; place-items: center;
+  }
+  .member-tile .nm { font-weight: 600; font-size: 14px; }
+  .member-tile .rl { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+  /* ---------- PIN entry ---------- */
+  .pin-display {
+    display: flex; justify-content: center; gap: 12px;
+    margin: 30px 0 36px;
+  }
+  .pin-dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid var(--line-2);
+    transition: all .15s ease;
+  }
+  .pin-dot.filled { background: var(--ink); border-color: var(--ink); }
+  .pin-pad {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    max-width: 280px; margin: 0 auto;
+  }
+  .pin-key {
+    aspect-ratio: 1.4;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 16px;
+    font-family: 'Fraunces', serif;
+    font-size: 26px; font-weight: 500;
+    color: var(--ink); cursor: pointer;
+    display: grid; place-items: center;
+    transition: transform .1s ease, background .15s ease;
+  }
+  .pin-key:active { transform: scale(0.94); background: var(--bg-2); }
+  .pin-key.action { background: transparent; border-color: transparent; font-size: 14px; color: var(--muted); font-family: inherit; font-weight: 600; }
+  .pin-error {
+    text-align: center; color: var(--danger);
+    font-size: 13px; font-weight: 600;
+    margin-top: 14px; min-height: 18px;
+  }
+
+  /* ---------- Modal / Sheet ---------- */
+  .sheet-overlay {
+    position: fixed; inset: 0;
+    background: rgba(26,34,49,0.5);
+    z-index: 100; opacity: 0;
+    transition: opacity .25s ease;
+    pointer-events: none;
+  }
+  .sheet-overlay.open { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed; bottom: 0; left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    width: 100%; max-width: 480px;
+    background: var(--bg);
+    border-radius: 22px 22px 0 0;
+    padding: 8px 18px 24px;
+    z-index: 110;
+    transition: transform .3s cubic-bezier(.22,1,.36,1);
+    max-height: 92vh; overflow-y: auto;
+  }
+  .sheet.open { transform: translateX(-50%) translateY(0); }
+  .sheet-handle {
+    width: 36px; height: 4px; border-radius: 2px;
+    background: var(--line-2); margin: 8px auto 16px;
+  }
+  .sheet h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 22px; font-weight: 500;
+    letter-spacing: -0.01em;
+    margin: 0 0 18px;
+  }
+
+  /* ---------- Tabs ---------- */
+  .tabs {
+    display: flex; gap: 4px;
+    background: var(--bg-2); padding: 4px;
+    border-radius: 12px; margin-bottom: 16px;
+  }
+  .tab {
+    flex: 1; text-align: center;
+    padding: 9px 10px; border-radius: 9px;
+    font-size: 13px; font-weight: 600; color: var(--muted);
+    cursor: pointer;
+  }
+  .tab.active { background: var(--card); color: var(--ink); box-shadow: var(--shadow-sm); }
+
+  /* ---------- Chip / pill ---------- */
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    background: var(--bg-2); color: var(--ink-2);
+  }
+  .chip.green { background: var(--success-soft); color: var(--success); }
+  .chip.red { background: var(--danger-soft); color: var(--danger); }
+  .chip.gold { background: var(--accent-soft); color: var(--accent); }
+  .chip.blue { background: var(--primary-soft); color: var(--primary); }
+
+  /* ---------- Per-member bars ---------- */
+  .member-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0;
+    border-top: 1px solid var(--line);
+  }
+  .member-bar:first-child { border-top: none; }
+  .member-bar .ring {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--primary-soft); color: var(--primary);
+    font-family: 'Fraunces', serif; font-size: 15px; font-weight: 500;
+    display: grid; place-items: center; flex-shrink: 0;
+  }
+  .member-bar .info { flex: 1; min-width: 0; }
+  .member-bar .info .nm { font-weight: 600; font-size: 14px; }
+  .member-bar .info .ln { color: var(--muted); font-size: 12px; margin-top: 1px; }
+  .member-bar .net {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px; font-weight: 600;
+    text-align: right;
+  }
+
+  /* ---------- Income grid (12 months) ---------- */
+  .month-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .month-cell {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 10px; padding: 8px 6px;
+    text-align: center; cursor: pointer;
+  }
+  .month-cell.has { background: var(--primary-soft); border-color: transparent; }
+  .month-cell .m { font-size: 10px; color: var(--muted); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+  .month-cell .a { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; margin-top: 2px; }
+  .month-cell.has .a { color: var(--primary); }
+
+  /* ---------- Loan card ---------- */
+  .loan-card { padding: 16px; }
+  .loan-card .head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .loan-card .name { font-weight: 700; font-size: 15px; }
+  .loan-card .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .loan-card .bal { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 500; margin-top: 14px; }
+  .loan-card .bar { height: 6px; background: var(--bg-2); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+  .loan-card .bar .fill { height: 100%; background: var(--primary); border-radius: 3px; }
+  .loan-card .foot { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: var(--muted); font-weight: 600; }
+
+  /* ---------- Empty state ---------- */
+  .empty {
+    text-align: center; padding: 40px 20px; color: var(--muted);
+  }
+  .empty .em-icon {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--bg-2);
+    margin: 0 auto 14px;
+    display: grid; place-items: center;
+  }
+  .empty p { margin: 0; font-size: 14px; }
+  .empty p + p { margin-top: 4px; font-size: 12px; }
+
+  /* ---------- Misc ---------- */
+  .divider { height: 1px; background: var(--line); margin: 16px 0; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .text-muted { color: var(--muted); }
+  .text-success { color: var(--success); }
+  .text-danger { color: var(--danger); }
+  .text-primary { color: var(--primary); }
+  .text-c { text-align: center; }
+  .mt-0 { margin-top: 0; }
+  .mt-2 { margin-top: 8px; }
+  .mt-3 { margin-top: 12px; }
+  .mt-4 { margin-top: 16px; }
+  .mb-2 { margin-bottom: 8px; }
+  .mb-3 { margin-bottom: 12px; }
+  .flex { display: flex; }
+  .flex-between { display: flex; justify-content: space-between; align-items: center; }
+  .gap-2 { gap: 8px; }
+  .gap-3 { gap: 12px; }
+  .grow { flex: 1; }
+  .hidden { display: none !important; }
+
+  /* Toast */
+  .toast {
+    position: fixed; top: 24px; left: 50%;
+    transform: translateX(-50%) translateY(-80px);
+    background: var(--ink); color: white;
+    padding: 12px 18px; border-radius: 12px;
+    font-size: 13px; font-weight: 600;
+    z-index: 200;
+    transition: transform .3s cubic-bezier(.22,1,.36,1);
+    box-shadow: var(--shadow-lg);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* Scroll lock when sheet open */
+  body.locked { overflow: hidden; }
+
+  /* Sync indicator on avatar */
+  .avatar { position: relative; }
+  .avatar::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; right: -1px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    border: 2px solid var(--bg);
+    background: var(--success);
+    box-sizing: border-box;
+    transition: background .2s ease;
+  }
+  .avatar.sync-error::after { background: var(--danger); }
+  .avatar.sync-pending::after { background: var(--warn); }
+  .avatar.sync-syncing::after {
+    background: var(--warn);
+    animation: syncpulse 1.2s ease-in-out infinite;
+  }
+  .avatar.sync-offline::after { background: var(--muted); }
+  .avatar.sync-idle::after { background: var(--muted); }
+  @keyframes syncpulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.75); }
+  }
+
+  /* Cloud card */
+  .cloud-card { padding: 16px; }
+  .cloud-card .head {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 14px;
+  }
+  .cloud-card .head .ic {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: var(--primary-soft); color: var(--primary);
+    display: grid; place-items: center; font-size: 20px;
+    flex-shrink: 0;
+  }
+  .cloud-card .head .acc {
+    font-weight: 600; font-size: 14px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .cloud-card .head .stat { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .cloud-card .actions { display: flex; gap: 8px; }
+  .cloud-card .actions .btn { flex: 1; padding: 11px 12px; font-size: 13px; }
+  .cloud-status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 9px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 600;
+    background: var(--success-soft); color: var(--success);
+    white-space: nowrap;
+  }
+  .cloud-status-pill .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor;
+  }
+  .cloud-status-pill.err { background: var(--danger-soft); color: var(--danger); }
+  .cloud-status-pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .cloud-status-pill.warn .dot { animation: syncpulse 1.2s ease-in-out infinite; }
+  .cloud-status-pill.muted { background: var(--bg-2); color: var(--muted); }
+
+  /* Microsoft sign-in button */
+  .btn-microsoft {
+    background: white;
+    color: #1a2231;
+    border: 1px solid var(--line-2);
+    padding: 14px 18px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .15s ease, transform .1s ease;
+  }
+  .btn-microsoft:hover { background: var(--bg-2); }
+  .btn-microsoft:active { transform: scale(0.97); }
+  .btn-microsoft svg { width: 18px; height: 18px; }
+
+  /* Sign-in screen extras */
+  .signin-features {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-top: 20px;
+  }
+  .signin-feature {
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: 13px; color: var(--ink-2); line-height: 1.45;
+  }
+  .signin-feature .ic {
+    width: 28px; height: 28px; flex-shrink: 0;
+    border-radius: 8px;
+    background: white; color: var(--primary);
+    display: grid; place-items: center; font-size: 14px;
+    margin-top: 1px;
+    box-shadow: var(--shadow-sm);
+  }
+  .signin-error {
+    background: var(--danger-soft); color: var(--danger);
+    padding: 10px 12px; border-radius: 10px;
+    font-size: 12px; font-weight: 500;
+    margin-top: 14px;
+    line-height: 1.45;
+  }
+  .signin-config-warning {
+    background: var(--warn-soft); color: var(--warn);
+    padding: 14px; border-radius: 12px;
+    font-size: 12px; line-height: 1.5;
+    margin-top: 14px;
+  }
+  .signin-config-warning strong { display: block; margin-bottom: 4px; font-size: 13px; }
+  .signin-config-warning code {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px;
+  }
+
+  /* Sign-in hero visual */
+  .signin-hero {
+    position: relative;
+    height: 180px;
+    margin-top: 28px;
+    overflow: hidden;
+  }
+  .hero-orb {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 140px; height: 140px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, var(--accent-soft) 0%, transparent 70%),
+                radial-gradient(circle at 70% 70%, var(--primary-soft) 0%, transparent 70%);
+    filter: blur(20px);
+    opacity: 0.9;
+  }
+  .hero-logo {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 84px; height: 84px;
+    border-radius: 22px;
+    background: var(--ink);
+    color: var(--accent);
+    display: grid; place-items: center;
+    font-family: 'Fraunces', serif;
+    font-size: 44px; font-weight: 500;
+    box-shadow: 0 14px 30px rgba(26,34,49,0.18), 0 4px 12px rgba(26,34,49,0.1);
+    animation: heroFloat 4s ease-in-out infinite;
+  }
+  @keyframes heroFloat {
+    0%, 100% { transform: translate(-50%, -50%); }
+    50% { transform: translate(-50%, calc(-50% - 4px)); }
+  }
+  .float-icon {
+    position: absolute;
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: white;
+    display: grid; place-items: center;
+    font-size: 19px;
+    box-shadow: 0 6px 18px rgba(26,34,49,0.12);
+    animation: floatBob 5s ease-in-out infinite;
+  }
+  .float-icon.f1 { top: 18%; left: 18%; animation-delay: 0s; }
+  .float-icon.f2 { top: 22%; right: 16%; animation-delay: 0.7s; }
+  .float-icon.f3 { bottom: 14%; left: 14%; animation-delay: 1.4s; }
+  .float-icon.f4 { bottom: 18%; right: 18%; animation-delay: 2.1s; }
+  @keyframes floatBob {
+    0%, 100% { transform: translateY(0) rotate(-3deg); }
+    50% { transform: translateY(-8px) rotate(3deg); }
+  }
+
+  /* Sign-in divider */
+  .signin-divider {
+    display: flex; align-items: center; gap: 10px;
+    margin: 16px 0 14px;
+    color: var(--muted);
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .signin-divider::before, .signin-divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--line);
+  }
+
+  /* Local-only banner */
+  .local-banner {
+    background: linear-gradient(135deg, var(--warn-soft), var(--accent-soft));
+    border: 1px solid rgba(192,132,84,0.25);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin: 14px 0 0;
+    font-size: 12px; line-height: 1.5;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .local-banner .ic { font-size: 18px; flex-shrink: 0; }
+  .local-banner .body { flex: 1; }
+  .local-banner .body strong { display: block; margin-bottom: 2px; font-size: 13px; }
+  .local-banner button {
+    margin-top: 8px;
+    background: var(--ink); color: white;
+    border: none; padding: 8px 14px; border-radius: 8px;
+    font-family: inherit; font-weight: 600; font-size: 12px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- =================== SIGN-IN SCREEN =================== -->
+  <div class="auth-screen screen" id="screen-signin">
+    <div class="signin-hero">
+      <div class="hero-orb"></div>
+      <div class="hero-logo">V</div>
+      <span class="float-icon f1">🛒</span>
+      <span class="float-icon f2">🏠</span>
+      <span class="float-icon f3">💳</span>
+      <span class="float-icon f4">🏦</span>
+    </div>
+
+    <div class="auth-brand" style="padding-top: 8px;">
+      <h1>Welcome to Vidhuvaru</h1>
+      <p>Track your family's money, together</p>
+    </div>
+
+    <div class="card" style="padding: 22px;">
+      <button class="btn-microsoft btn-block" onclick="signIn()" id="signin-btn">
+        <svg viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+          <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+          <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+          <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+        </svg>
+        <span>Sign in with Microsoft</span>
+      </button>
+
+      <div id="signin-error" class="signin-error hidden"></div>
+      <div id="signin-config-warning" class="signin-config-warning hidden">
+        <strong>⚠ Not configured yet</strong>
+        The app's Microsoft Client ID hasn't been set. See the README for the 4-step setup, OR try the app first without sign-in (button below).
+      </div>
+
+      <div class="signin-divider"><span>or</span></div>
+
+      <button class="btn btn-ghost btn-block" onclick="skipSignIn()" style="font-weight: 600;">
+        Use without cloud sync
+      </button>
+      <p class="text-c text-muted" style="font-size:11px; margin: 12px 0 0; line-height: 1.5;">
+        Local-only — works on this phone only.<br/>
+        Connect Microsoft anytime from <strong>More → Cloud sync</strong>.
+      </p>
+    </div>
+
+    <div class="signin-features">
+      <div class="signin-feature"><div class="ic">📱</div><div>Add to your home screen — works like a real app</div></div>
+      <div class="signin-feature"><div class="ic">☁</div><div>Data syncs to <strong>your</strong> OneDrive — your account, your data</div></div>
+      <div class="signin-feature"><div class="ic">👨‍👩‍👧</div><div>Each family member picks themselves with a 4-digit PIN</div></div>
+    </div>
+  </div>
+
+  <!-- =================== SETUP SCREEN =================== -->
+  <div class="auth-screen screen" id="screen-setup">
+    <div class="auth-brand">
+      <div class="logo">V</div>
+      <h1>Vidhuvaru</h1>
+      <p>Family finance, together</p>
+    </div>
+    <div id="setup-step-1">
+      <div class="card" style="padding: 22px;">
+        <h2 style="font-family:'Fraunces',serif; font-size:20px; font-weight:500; margin:0 0 8px;">Welcome</h2>
+        <p class="text-muted" style="font-size:13px; margin:0 0 18px;">Set up your family with up to 6 members. Each person gets a 4-digit PIN to log in from their phone.</p>
+        <button class="btn btn-primary btn-block btn-lg" onclick="setupNext()">Get started</button>
+      </div>
+    </div>
+    <div id="setup-step-2" class="hidden">
+      <div class="card" style="padding: 18px;">
+        <h2 style="font-family:'Fraunces',serif; font-size:20px; font-weight:500; margin:0 0 6px;">Add family members</h2>
+        <p class="text-muted" style="font-size:13px; margin:0 0 14px;">Add yourself first (you'll be the Head). Add up to 6 total.</p>
+        <div id="setup-members-list"></div>
+        <button class="btn btn-soft btn-block mt-3" onclick="openMemberSheet()" id="setup-add-btn">+ Add member</button>
+        <button class="btn btn-primary btn-block btn-lg mt-3" onclick="finishSetup()" id="setup-finish-btn" disabled>Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== LOGIN SCREEN =================== -->
+  <div class="auth-screen screen" id="screen-login">
+    <div class="auth-brand">
+      <div class="logo">V</div>
+      <h1>Welcome back</h1>
+      <p id="login-subtitle">Who's logging in?</p>
+    </div>
+    <div id="login-member-picker">
+      <div class="member-grid" id="login-tiles"></div>
+    </div>
+    <div id="login-pin-entry" class="hidden">
+      <div class="pin-display">
+        <div class="pin-dot" data-pos="0"></div>
+        <div class="pin-dot" data-pos="1"></div>
+        <div class="pin-dot" data-pos="2"></div>
+        <div class="pin-dot" data-pos="3"></div>
+      </div>
+      <div class="pin-pad">
+        <div class="pin-key" onclick="pinPress('1')">1</div>
+        <div class="pin-key" onclick="pinPress('2')">2</div>
+        <div class="pin-key" onclick="pinPress('3')">3</div>
+        <div class="pin-key" onclick="pinPress('4')">4</div>
+        <div class="pin-key" onclick="pinPress('5')">5</div>
+        <div class="pin-key" onclick="pinPress('6')">6</div>
+        <div class="pin-key" onclick="pinPress('7')">7</div>
+        <div class="pin-key" onclick="pinPress('8')">8</div>
+        <div class="pin-key" onclick="pinPress('9')">9</div>
+        <div class="pin-key action" onclick="loginBack()">Back</div>
+        <div class="pin-key" onclick="pinPress('0')">0</div>
+        <div class="pin-key action" onclick="pinDelete()">⌫</div>
+      </div>
+      <div class="pin-error" id="pin-error"></div>
+    </div>
+  </div>
+
+  <!-- =================== DASHBOARD =================== -->
+  <div class="screen" id="screen-dashboard">
+    <div class="topbar">
+      <div class="greeting">
+        <div class="hello">As-salaam alaikum,</div>
+        <div class="name" id="user-name">—</div>
+      </div>
+      <div class="avatar" id="user-avatar" onclick="goto('more')">—</div>
+    </div>
+
+    <div class="hero">
+      <div class="label">Family Net Position</div>
+      <div class="value"><span class="cur">MVR</span><span id="dash-net">0</span></div>
+      <div class="sub">
+        <div class="item">
+          <span class="k">Savings</span>
+          <span class="v pos" id="dash-savings">0</span>
+        </div>
+        <div class="item">
+          <span class="k">Outstanding</span>
+          <span class="v neg" id="dash-outstanding">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat tinted">
+        <div class="k">This Month Income</div>
+        <div class="v" id="dash-income">0</div>
+      </div>
+      <div class="stat tinted gold">
+        <div class="k">Monthly Loan Pmt</div>
+        <div class="v" id="dash-loan-pmt">0</div>
+      </div>
+      <div class="stat tinted green">
+        <div class="k">Vidhuvaru</div>
+        <div class="v small" id="dash-vidhuvaru">0</div>
+      </div>
+      <div class="stat tinted red">
+        <div class="k">Island</div>
+        <div class="v small" id="dash-island">0</div>
+      </div>
+    </div>
+
+    <div class="section-title">
+      <h3>Recent activity</h3>
+      <a onclick="goto('expenses')">See all →</a>
+    </div>
+    <div class="card" id="dash-recent">
+      <div class="empty">
+        <div class="em-icon">📋</div>
+        <p>No activity yet</p>
+        <p>Tap + to log your first expense</p>
+      </div>
+    </div>
+
+    <div class="section-title">
+      <h3>By member</h3>
+    </div>
+    <div class="card" id="dash-members"></div>
+  </div>
+
+  <!-- =================== EXPENSES =================== -->
+  <div class="screen" id="screen-expenses">
+    <div class="topbar">
+      <div class="greeting">
+        <div class="hello">All spending</div>
+        <div class="name">Expenses</div>
+      </div>
+      <div class="avatar" id="user-avatar-2" onclick="goto('more')">—</div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="all" onclick="filterExpenses('all')">All</div>
+      <div class="tab" data-tab="Vidhuvaru" onclick="filterExpenses('Male\\'')">Vidhuvaru</div>
+      <div class="tab" data-tab="Island" onclick="filterExpenses('Island')">Island</div>
+    </div>
+
+    <div class="stat-grid mb-3">
+      <div class="stat">
+        <div class="k">This month</div>
+        <div class="v" id="exp-month-total">0</div>
+      </div>
+      <div class="stat">
+        <div class="k">Total logged</div>
+        <div class="v" id="exp-total">0</div>
+      </div>
+    </div>
+
+    <div class="section-title">
+      <h3>By category</h3>
+    </div>
+    <div class="card" id="exp-by-cat"></div>
+
+    <div class="section-title">
+      <h3>All expenses</h3>
+    </div>
+    <div class="card" id="exp-list"></div>
+  </div>
+
+  <!-- =================== LOANS =================== -->
+  <div class="screen" id="screen-loans">
+    <div class="topbar">
+      <div class="greeting">
+        <div class="hello">Debts &amp; obligations</div>
+        <div class="name">Loans</div>
+      </div>
+      <div class="avatar" id="user-avatar-3" onclick="goto('more')">—</div>
+    </div>
+
+    <div class="hero" style="margin-bottom: 18px;">
+      <div class="label">Total Outstanding</div>
+      <div class="value"><span class="cur">MVR</span><span id="loans-out">0</span></div>
+      <div class="sub">
+        <div class="item">
+          <span class="k">Paid down</span>
+          <span class="v pos" id="loans-paid">0</span>
+        </div>
+        <div class="item">
+          <span class="k">Monthly</span>
+          <span class="v neg" id="loans-monthly">0</span>
+        </div>
+        <div class="item">
+          <span class="k">Active</span>
+          <span class="v" id="loans-count">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">
+      <h3>All loans</h3>
+      <a onclick="openLoanSheet()">+ Add</a>
+    </div>
+    <div id="loans-list"></div>
+  </div>
+
+  <!-- =================== SAVINGS =================== -->
+  <div class="screen" id="screen-savings">
+    <div class="topbar">
+      <div class="greeting">
+        <div class="hello">Family reserves</div>
+        <div class="name">Savings</div>
+      </div>
+      <div class="avatar" id="user-avatar-4" onclick="goto('more')">—</div>
+    </div>
+
+    <div class="hero" style="margin-bottom: 18px; background: var(--primary);">
+      <div class="label">Current Balance</div>
+      <div class="value"><span class="cur">MVR</span><span id="sav-bal">0</span></div>
+      <div class="sub">
+        <div class="item">
+          <span class="k">Deposits</span>
+          <span class="v pos" id="sav-dep">0</span>
+        </div>
+        <div class="item">
+          <span class="k">Withdrawals</span>
+          <span class="v neg" id="sav-wd">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title">
+      <h3>Transactions</h3>
+      <a onclick="openSavingsSheet()">+ Add</a>
+    </div>
+    <div class="card" id="sav-list"></div>
+  </div>
+
+  <!-- =================== MORE =================== -->
+  <div class="screen" id="screen-more">
+    <div class="topbar">
+      <div class="greeting">
+        <div class="hello">Settings &amp; people</div>
+        <div class="name">More</div>
+      </div>
+    </div>
+
+    <div class="card mb-3" style="padding: 18px;">
+      <div class="flex gap-3" style="align-items:center;">
+        <div class="avatar" id="more-avatar" style="width:56px; height:56px; font-size:22px;">—</div>
+        <div class="grow">
+          <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:500;" id="more-name">—</div>
+          <div class="text-muted" style="font-size:13px;" id="more-role">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title"><h3>Income</h3></div>
+    <div class="card mb-3" style="padding:16px;">
+      <p class="text-muted" style="font-size:13px; margin:0 0 12px;">Update your monthly income for any month this year.</p>
+      <div class="month-grid" id="more-income-grid"></div>
+    </div>
+
+    <div class="section-title"><h3>Cloud sync</h3></div>
+    <div class="card cloud-card mb-3" id="cloud-card">
+      <!-- populated by renderCloudCard() -->
+    </div>
+
+    <div class="section-title">
+      <h3>Family members</h3>
+      <a onclick="openMemberSheet()" id="more-add-link">+ Add</a>
+    </div>
+    <div class="card mb-3" id="more-members-list"></div>
+
+    <div class="section-title"><h3>Account</h3></div>
+    <div class="card" style="padding: 8px 16px;">
+      <div class="row" onclick="changePin()">
+        <div class="icon">🔑</div>
+        <div class="body"><div class="t">Change my PIN</div></div>
+      </div>
+      <div class="row" onclick="logout()">
+        <div class="icon">🚪</div>
+        <div class="body"><div class="t">Log out (this device)</div><div class="s">Keeps Microsoft signed in</div></div>
+      </div>
+      <div class="row" onclick="fullSignOut()">
+        <div class="icon">🔌</div>
+        <div class="body"><div class="t">Sign out of Microsoft</div><div class="s">Disconnects this device from OneDrive</div></div>
+      </div>
+      <div class="row" onclick="exportData()">
+        <div class="icon">📤</div>
+        <div class="body"><div class="t">Export all data (JSON)</div><div class="s">Download a backup</div></div>
+      </div>
+      <div class="row" onclick="resetApp()" style="color: var(--danger);">
+        <div class="icon" style="background: var(--danger-soft);">⚠️</div>
+        <div class="body"><div class="t" style="color:var(--danger);">Reset everything</div><div class="s">Erase all family data (head only)</div></div>
+      </div>
+    </div>
+    <div style="text-align:center; color:var(--muted); font-size:11px; margin: 24px 0 8px;">
+      Vidhuvaru · v1
+    </div>
+  </div>
+
+  <!-- Bottom nav -->
+  <nav class="nav" id="bottom-nav">
+    <div class="nav-item active" data-view="dashboard" onclick="goto('dashboard')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3v-6h6v6h3a1 1 0 001-1V10"/></svg>
+      <span>Home</span>
+    </div>
+    <div class="nav-item" data-view="expenses" onclick="goto('expenses')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m-6 4h6m-6 4h4M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1z"/></svg>
+      <span>Expenses</span>
+    </div>
+    <div class="nav-item" data-view="loans" onclick="goto('loans')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M5 6h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z"/></svg>
+      <span>Loans</span>
+    </div>
+    <div class="nav-item" data-view="savings" onclick="goto('savings')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-3.5 0-6 1.8-6 4s2.5 4 6 4 6-1.8 6-4-2.5-4-6-4zM6 12v3c0 2.2 2.5 4 6 4s6-1.8 6-4v-3M6 8C6 5.8 8.5 4 12 4s6 1.8 6 4"/></svg>
+      <span>Savings</span>
+    </div>
+    <div class="nav-item" data-view="more" onclick="goto('more')">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg>
+      <span>More</span>
+    </div>
+  </nav>
+
+  <!-- FAB -->
+  <button class="fab" id="fab" onclick="openExpenseSheet()" aria-label="Add">
+    <svg fill="none" stroke="white" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>
+  </button>
+
+  <!-- Sheet overlay & bottom sheet -->
+  <div class="sheet-overlay" id="sheet-overlay" onclick="closeSheet()"></div>
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <div id="sheet-content"></div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+ *  STATE
+ * ============================================================ */
+const KEY = {
+  members: 'app:members',
+  expenses: 'app:expenses',
+  loans: 'app:loans',
+  savings: 'app:savings',
+  income: 'app:income',
+  initialized: 'app:initialized',
+  currentUser: 'app:currentUser', // personal (not shared)
+};
+
+const state = {
+  members: [],
+  expenses: [],
+  loans: [],
+  savings: [],
+  income: {}, // {memberId: {YYYY-MM: amount}}
+  currentMember: null,
+  // UI
+  view: 'dashboard',
+  expFilter: 'all',
+  pinBuffer: '',
+  loginMemberId: null,
+  pinMode: 'login', // 'login' | 'set' | 'changeOld' | 'changeNew'
+  pinNewBuf: '',
+};
+
+const ROLES = ['Head', 'Spouse', 'Parent', 'Brother', 'Sister', 'Son', 'Daughter', 'Other'];
+const HOUSES = ["Vidhuvaru", 'Island'];
+const CATEGORIES = [
+  'Groceries','Rent','Utilities','Internet/Phone','Transport','School/Education',
+  'Medical','Maintenance','Fuel','Eating Out','Clothing','Household Supplies',
+  'Loan Payment','Savings','Other'
+];
+const CAT_ICON = {
+  'Groceries':'🛒','Rent':'🏠','Utilities':'💡','Internet/Phone':'📱','Transport':'🚗',
+  'School/Education':'📚','Medical':'🩺','Maintenance':'🔧','Fuel':'⛽','Eating Out':'🍽️',
+  'Clothing':'👕','Household Supplies':'🧺','Loan Payment':'💳','Savings':'🏦','Other':'📦'
+};
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* ============================================================
+ *  STORAGE HELPERS (localStorage)
+ *  Signatures kept async + `shared` param for compatibility,
+ *  but localStorage is always per-device. Cloud sync is what
+ *  makes data shared across family devices.
+ * ============================================================ */
+const LS_NS = 'vidhuvaru:';
+async function sget(key, shared=true, fallback=null) {
+  try {
+    const v = localStorage.getItem(LS_NS + key);
+    return v ? JSON.parse(v) : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+async function sset(key, value, shared=true) {
+  try {
+    localStorage.setItem(LS_NS + key, JSON.stringify(value));
+    return true;
+  } catch (e) {
+    console.error('storage set failed', key, e);
+    toast('Save failed — storage full?');
+    return false;
+  }
+}
+async function sdel(key, shared=true) {
+  try { localStorage.removeItem(LS_NS + key); } catch (e) {}
+}
+
+/* ============================================================
+ *  UTILS
+ * ============================================================ */
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+const uid = () => Math.random().toString(36).slice(2, 10);
+const today = () => new Date().toISOString().slice(0, 10);
+const thisMonth = () => new Date().toISOString().slice(0, 7);
+
+function fmt(n) {
+  if (n == null || isNaN(n)) return '0';
+  n = Math.round(Number(n));
+  return n.toLocaleString('en-US');
+}
+function initials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+}
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+function getMember(id) {
+  return state.members.find(m => m.id === id);
+}
+function memberName(id) {
+  const m = getMember(id);
+  return m ? m.name : 'Unknown';
+}
+
+/* ============================================================
+ *  LOAD / SAVE
+ * ============================================================ */
+async function loadState() {
+  state.members = await sget(KEY.members, true, []);
+  state.expenses = await sget(KEY.expenses, true, []);
+  state.loans = await sget(KEY.loans, true, []);
+  state.savings = await sget(KEY.savings, true, []);
+  state.income = await sget(KEY.income, true, {});
+  // current user is personal (per-device)
+  const cu = await sget(KEY.currentUser, false, null);
+  if (cu && state.members.find(m => m.id === cu)) {
+    state.currentMember = cu;
+  }
+}
+
+async function saveMembers()  { const r = await sset(KEY.members, state.members, true); markDirty(); return r; }
+async function saveExpenses() { const r = await sset(KEY.expenses, state.expenses, true); markDirty(); return r; }
+async function saveLoans()    { const r = await sset(KEY.loans, state.loans, true); markDirty(); return r; }
+async function saveSavings()  { const r = await sset(KEY.savings, state.savings, true); markDirty(); return r; }
+async function saveIncome()   { const r = await sset(KEY.income, state.income, true); markDirty(); return r; }
+async function saveCurrentUser() { return sset(KEY.currentUser, state.currentMember, false); }
+
+/* ============================================================
+ *  MICROSOFT AUTH (MSAL) + ONEDRIVE SYNC
+ * ============================================================ */
+
+// ★★★ CONFIGURATION — REPLACE BEFORE DEPLOYING ★★★
+// 1. Register an app at https://portal.azure.com (see README)
+// 2. Paste your "Application (client) ID" below
+// 3. In Azure, add your deployed URL as a Single-Page App redirect URI
+const AZURE_CLIENT_ID = 'YOUR_AZURE_CLIENT_ID_HERE';
+// ★★★ END CONFIGURATION ★★★
+
+const MSAL_CONFIG = {
+  auth: {
+    clientId: AZURE_CLIENT_ID,
+    // 'consumers' = personal Microsoft accounts (outlook.com, hotmail.com, live.com)
+    // change to 'common' if you also want work/school accounts
+    authority: 'https://login.microsoftonline.com/consumers',
+    redirectUri: window.location.origin + window.location.pathname,
+  },
+  cache: {
+    cacheLocation: 'localStorage',
+    storeAuthStateInCookie: false,
+  }
+};
+
+const GRAPH_SCOPES = ['Files.ReadWrite', 'User.Read'];
+
+const CLOUD = {
+  filename: 'vidhuvaru-data.json',
+  folder: 'Apps/Vidhuvaru',
+  filePath: 'Apps/Vidhuvaru/vidhuvaru-data.json',
+  graphBase: 'https://graph.microsoft.com/v1.0',
+  debounceMs: 3000,
+  retryMs: 30000,
+};
+
+let msalInstance = null;
+let currentAccount = null;
+let localOnly = false;  // when true, app works without Microsoft sign-in (no cloud sync)
+
+const sync = {
+  status: 'idle',
+  lastSyncAt: null,
+  lastError: null,
+  debounceTimer: null,
+  retryTimer: null,
+  inflight: false,
+  enabled: true,
+  suppressDirty: false,
+};
+
+/* ---------- MSAL initialization ---------- */
+
+function isMsalConfigured() {
+  return AZURE_CLIENT_ID && AZURE_CLIENT_ID !== 'YOUR_AZURE_CLIENT_ID_HERE';
+}
+
+async function initMsal() {
+  if (!isMsalConfigured()) return { ok: false, reason: 'not-configured' };
+  if (typeof msal === 'undefined') return { ok: false, reason: 'library-not-loaded' };
+
+  try {
+    msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
+    // Handle the redirect response (if returning from Microsoft login)
+    const response = await msalInstance.handleRedirectPromise();
+    if (response && response.account) {
+      msalInstance.setActiveAccount(response.account);
+      currentAccount = response.account;
+      return { ok: true, signedIn: true };
+    }
+    // Otherwise, check for an existing cached account
+    const accounts = msalInstance.getAllAccounts();
+    if (accounts.length > 0) {
+      currentAccount = accounts[0];
+      msalInstance.setActiveAccount(currentAccount);
+      return { ok: true, signedIn: true };
+    }
+    return { ok: true, signedIn: false };
+  } catch (err) {
+    console.error('MSAL init failed', err);
+    return { ok: false, reason: 'init-error', error: err };
+  }
+}
+
+async function signIn() {
+  // Clear any prior error
+  const errEl = document.getElementById('signin-error');
+  if (errEl) errEl.classList.add('hidden');
+
+  if (!isMsalConfigured()) {
+    document.getElementById('signin-config-warning')?.classList.remove('hidden');
+    return;
+  }
+  if (!msalInstance) {
+    showSigninError('Sign-in library failed to load. Refresh and try again.');
+    return;
+  }
+  try {
+    await msalInstance.loginRedirect({
+      scopes: GRAPH_SCOPES,
+      prompt: 'select_account',
+    });
+    // Browser redirects to Microsoft; rest of code doesn't run.
+  } catch (err) {
+    showSigninError(err.message || 'Sign-in failed');
+  }
+}
+
+async function microsoftSignOut() {
+  if (!msalInstance || !currentAccount) return;
+  try {
+    await msalInstance.logoutRedirect({
+      account: currentAccount,
+      postLogoutRedirectUri: window.location.origin + window.location.pathname,
+    });
+  } catch (e) {
+    console.error('Sign-out failed', e);
+  }
+}
+
+function showSigninError(msg) {
+  const errEl = document.getElementById('signin-error');
+  if (!errEl) return;
+  errEl.textContent = msg;
+  errEl.classList.remove('hidden');
+}
+
+async function skipSignIn() {
+  localOnly = true;
+  await sset('app:localOnly', true, true);
+  await loadState();
+  if (state.members.length === 0) {
+    showScreen('setup');
+  } else if (!state.currentMember) {
+    showScreen('login');
+    renderLoginPicker();
+  } else {
+    goto('dashboard');
+  }
+}
+
+async function connectMicrosoft() {
+  // Called from More tab when in local-only mode
+  if (!isMsalConfigured()) {
+    toast('Azure setup needed first — see README');
+    return;
+  }
+  localOnly = false;
+  await sset('app:localOnly', false, true);
+  await signIn(); // redirects to Microsoft
+}
+
+async function getAccessToken() {
+  if (!msalInstance) throw new Error('Not initialized');
+  if (!currentAccount) throw new Error('Not signed in');
+  try {
+    const result = await msalInstance.acquireTokenSilent({
+      scopes: GRAPH_SCOPES,
+      account: currentAccount,
+    });
+    return result.accessToken;
+  } catch (e) {
+    if (e && (e.name === 'InteractionRequiredAuthError' || /interaction_required|consent_required|login_required/i.test(e.errorCode || e.message || ''))) {
+      // Need interactive — redirect (this will reload the page)
+      await msalInstance.acquireTokenRedirect({ scopes: GRAPH_SCOPES });
+      throw new Error('Re-authenticating');
+    }
+    throw e;
+  }
+}
+
+/* ---------- Helpers ---------- */
+
+function nowIso() { return new Date().toISOString(); }
+function timeAgo(d) {
+  if (!d) return 'never';
+  const s = Math.round((Date.now() - d.getTime()) / 1000);
+  if (s < 5) return 'just now';
+  if (s < 60) return s + 's ago';
+  const m = Math.round(s / 60);
+  if (m < 60) return m + ' min ago';
+  const h = Math.round(m / 60);
+  if (h < 24) return h + ' hr ago';
+  return Math.round(h / 24) + ' days ago';
+}
+function truncate(s, n) { return s.length > n ? s.slice(0, n) + '…' : s; }
+
+function setSyncStatus(status, errMsg) {
+  sync.status = status;
+  if (errMsg !== undefined) sync.lastError = errMsg;
+  document.querySelectorAll('.avatar').forEach(el => {
+    el.classList.remove('sync-synced','sync-pending','sync-syncing','sync-error','sync-offline','sync-idle');
+    el.classList.add('sync-' + status);
+  });
+  renderCloudCard();
+}
+
+function markDirty() {
+  if (sync.suppressDirty) return;
+  if (!sync.enabled || !state.currentMember) return;
+  if (!currentAccount) return; // No point queuing if never signed in
+  if (sync.debounceTimer) clearTimeout(sync.debounceTimer);
+  setSyncStatus('pending');
+  sync.debounceTimer = setTimeout(() => { performSync().catch(()=>{}); }, CLOUD.debounceMs);
+}
+
+function buildSnapshot() {
+  return {
+    meta: {
+      last_modified: nowIso(),
+      last_modified_by: state.currentMember,
+      app: 'Vidhuvaru',
+      version: 1
+    },
+    members: state.members,
+    expenses: state.expenses,
+    loans: state.loans,
+    savings: state.savings,
+    income: state.income
+  };
+}
+
+/* ---------- Push / Pull via Graph API ---------- */
+
+async function performSync() {
+  if (sync.inflight) return;
+  if (!sync.enabled) return;
+  if (!state.currentMember || !currentAccount) return;
+  sync.inflight = true;
+  if (sync.retryTimer) { clearTimeout(sync.retryTimer); sync.retryTimer = null; }
+  setSyncStatus('syncing');
+
+  try {
+    const snapshot = buildSnapshot();
+    const json = JSON.stringify(snapshot);
+    const token = await getAccessToken();
+    // PUT to a nested path auto-creates folders (no need to create folder separately)
+    const url = `${CLOUD.graphBase}/me/drive/root:/${CLOUD.filePath}:/content`;
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: json,
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`HTTP ${res.status}: ${truncate(txt, 160)}`);
+    }
+    sync.lastSyncAt = new Date();
+    sync.lastError = null;
+    sync.inflight = false;
+    await sset('app:lastModified', snapshot.meta.last_modified, true);
+    setSyncStatus('synced');
+  } catch (err) {
+    sync.inflight = false;
+    setSyncStatus('error', err.message || String(err));
+    if (sync.retryTimer) clearTimeout(sync.retryTimer);
+    sync.retryTimer = setTimeout(() => { performSync().catch(()=>{}); }, CLOUD.retryMs);
+  }
+}
+
+async function performPull() {
+  if (sync.inflight) return null;
+  if (!currentAccount) return null;
+  sync.inflight = true;
+  setSyncStatus('syncing');
+
+  try {
+    const token = await getAccessToken();
+    const url = `${CLOUD.graphBase}/me/drive/root:/${CLOUD.filePath}:/content`;
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (res.status === 404) {
+      sync.inflight = false;
+      sync.lastSyncAt = new Date();
+      setSyncStatus('synced');
+      return { found: false };
+    }
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`HTTP ${res.status}: ${truncate(txt, 160)}`);
+    }
+    const text = await res.text();
+    let snapshot;
+    try {
+      snapshot = JSON.parse(text);
+    } catch (e) {
+      throw new Error('Could not parse cloud file (corrupted?)');
+    }
+    sync.lastSyncAt = new Date();
+    sync.lastError = null;
+    sync.inflight = false;
+    setSyncStatus('synced');
+    return { found: true, snapshot };
+  } catch (err) {
+    sync.inflight = false;
+    setSyncStatus('error', err.message || String(err));
+    return { found: false, error: err.message };
+  }
+}
+
+async function applySnapshot(snapshot) {
+  if (!snapshot) return;
+  sync.suppressDirty = true;
+  state.members = snapshot.members || [];
+  state.expenses = snapshot.expenses || [];
+  state.loans = snapshot.loans || [];
+  state.savings = snapshot.savings || [];
+  state.income = snapshot.income || {};
+  await sset(KEY.members, state.members, true);
+  await sset(KEY.expenses, state.expenses, true);
+  await sset(KEY.loans, state.loans, true);
+  await sset(KEY.savings, state.savings, true);
+  await sset(KEY.income, state.income, true);
+  if (snapshot.meta?.last_modified) {
+    await sset('app:lastModified', snapshot.meta.last_modified, true);
+  }
+  sync.suppressDirty = false;
+}
+
+async function pullAndMaybeApply() {
+  const result = await performPull();
+  if (result && result.found && result.snapshot) {
+    const localLast = await sget('app:lastModified', true, null);
+    const cloudLast = result.snapshot?.meta?.last_modified || null;
+    if (!localLast || (cloudLast && cloudLast > localLast)) {
+      await applySnapshot(result.snapshot);
+      if (state.view) {
+        if (state.view === 'dashboard') renderDashboard();
+        else if (state.view === 'expenses') renderExpenses();
+        else if (state.view === 'loans') renderLoans();
+        else if (state.view === 'savings') renderSavings();
+        else if (state.view === 'more') renderMore();
+      }
+      return { applied: true };
+    }
+  }
+  return { applied: false, result };
+}
+
+function renderCloudCard() {
+  const el = document.getElementById('cloud-card');
+  if (!el) return;
+
+  // Local-only mode — show a friendly connect prompt
+  if (localOnly && !currentAccount) {
+    el.innerHTML = `
+      <div class="head">
+        <div class="ic" style="background: var(--warn-soft); color: var(--warn);">☁</div>
+        <div class="info grow" style="min-width:0;">
+          <div class="acc">Not connected</div>
+          <div class="stat">Data only on this phone</div>
+        </div>
+        <span class="cloud-status-pill muted"><span class="dot"></span>Local only</span>
+      </div>
+      <p style="font-size:12px; color:var(--ink-2); margin:0 0 12px; line-height:1.5;">
+        Connect Microsoft to sync your data to OneDrive — so other family members can use the app too.
+      </p>
+      <button class="btn-microsoft btn-block" onclick="connectMicrosoft()" style="padding: 11px 14px; font-size: 13px;">
+        <svg viewBox="0 0 21 21" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+          <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+          <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+          <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+          <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+        </svg>
+        <span>Connect Microsoft</span>
+      </button>
+    `;
+    return;
+  }
+
+  const accLabel = currentAccount ? (currentAccount.username || currentAccount.name || 'Microsoft account') : 'Not signed in';
+  const cfg = {
+    synced:  { cls: '',     txt: 'Connected',  show: 'Last synced ' + timeAgo(sync.lastSyncAt) },
+    pending: { cls: 'warn', txt: 'Pending',    show: 'Saving in a moment…' },
+    syncing: { cls: 'warn', txt: 'Syncing',    show: 'Saving to OneDrive…' },
+    error:   { cls: 'err',  txt: 'Sync error', show: sync.lastError ? truncate(sync.lastError, 80) : 'Will retry shortly' },
+    offline: { cls: 'muted',txt: 'Local only', show: 'Data only on this phone' },
+    idle:    { cls: 'muted',txt: currentAccount ? 'Idle' : 'Offline', show: sync.lastSyncAt ? 'Last synced ' + timeAgo(sync.lastSyncAt) : (currentAccount ? 'Waiting for changes' : 'Sign in to enable cloud sync') }
+  };
+  const p = cfg[sync.status] || cfg.idle;
+  el.innerHTML = `
+    <div class="head">
+      <div class="ic">☁️</div>
+      <div class="info grow" style="min-width:0;">
+        <div class="acc">${escapeHtml(accLabel)}</div>
+        <div class="stat">${escapeHtml(p.show)}</div>
+      </div>
+      <span class="cloud-status-pill ${p.cls}"><span class="dot"></span>${p.txt}</span>
+    </div>
+    <div class="actions">
+      <button class="btn btn-soft" onclick="manualSync()" ${!currentAccount ? 'disabled' : ''}>Sync now</button>
+      <button class="btn btn-soft" onclick="manualPull()" ${!currentAccount ? 'disabled' : ''}>Pull from cloud</button>
+    </div>
+    <div style="margin-top:10px; font-size:11px; color:var(--muted);">
+      File: <strong>OneDrive › ${escapeHtml(CLOUD.folder)} › ${escapeHtml(CLOUD.filename)}</strong>
+    </div>
+  `;
+}
+
+async function manualSync() {
+  if (!currentAccount) { toast('Sign in first'); return; }
+  if (sync.debounceTimer) { clearTimeout(sync.debounceTimer); sync.debounceTimer = null; }
+  await performSync();
+  if (sync.status === 'synced') toast('Saved to OneDrive');
+  else if (sync.lastError) toast('Sync failed: ' + truncate(sync.lastError, 50));
+}
+
+async function manualPull() {
+  if (!currentAccount) { toast('Sign in first'); return; }
+  if (!confirm('Replace your current data with the latest from OneDrive?\n\nYour unsynced local changes will be overwritten.')) return;
+  const result = await performPull();
+  if (result && result.found && result.snapshot) {
+    await applySnapshot(result.snapshot);
+    if (state.view) goto(state.view);
+    toast('Pulled latest from OneDrive');
+  } else if (result && !result.found && !result.error) {
+    toast('No cloud file yet');
+  } else if (result?.error) {
+    toast('Pull failed');
+  }
+}
+
+// Keep "last synced X ago" fresh in the UI
+setInterval(() => {
+  if (state.view === 'more') renderCloudCard();
+}, 30000);
+
+/* ============================================================
+ *  ROUTING / SCREEN MGMT
+ * ============================================================ */
+function showScreen(id) {
+  $$('.screen').forEach(s => s.classList.remove('active'));
+  $('#screen-' + id).classList.add('active');
+  // nav state
+  if (['dashboard','expenses','loans','savings','more'].includes(id)) {
+    $$('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === id));
+    $('#bottom-nav').style.display = '';
+    $('#fab').style.display = '';
+    // FAB action depends on view
+    $('#fab').onclick = () => {
+      if (id === 'loans') openLoanSheet();
+      else if (id === 'savings') openSavingsSheet();
+      else if (id === 'more') openMemberSheet();
+      else openExpenseSheet();
+    };
+  } else {
+    $('#bottom-nav').style.display = 'none';
+    $('#fab').style.display = 'none';
+  }
+  state.view = id;
+  window.scrollTo(0, 0);
+}
+
+function goto(view) {
+  if (!state.currentMember && view !== 'login' && view !== 'setup') return;
+  showScreen(view);
+  if (view === 'dashboard') renderDashboard();
+  if (view === 'expenses') renderExpenses();
+  if (view === 'loans') renderLoans();
+  if (view === 'savings') renderSavings();
+  if (view === 'more') renderMore();
+}
+
+/* ============================================================
+ *  SETUP FLOW
+ * ============================================================ */
+function setupNext() {
+  $('#setup-step-1').classList.add('hidden');
+  $('#setup-step-2').classList.remove('hidden');
+  renderSetupMembers();
+}
+
+function renderSetupMembers() {
+  const wrap = $('#setup-members-list');
+  if (state.members.length === 0) {
+    wrap.innerHTML = '<div class="empty" style="padding:24px;"><p>No members yet</p><p>Add yourself first as Head</p></div>';
+  } else {
+    wrap.innerHTML = state.members.map(m => `
+      <div class="row">
+        <div class="icon" style="background: var(--primary-soft); color: var(--primary); font-family:'Fraunces',serif; font-weight:500;">${escapeHtml(initials(m.name))}</div>
+        <div class="body">
+          <div class="t">${escapeHtml(m.name)}</div>
+          <div class="s">${escapeHtml(m.role)} · ${escapeHtml(m.lives_in)}</div>
+        </div>
+        <div class="amt">${m.pin ? '🔒' : ''}</div>
+      </div>
+    `).join('');
+  }
+  $('#setup-add-btn').disabled = state.members.length >= 6;
+  $('#setup-add-btn').textContent = state.members.length >= 6 ? '6 of 6 added' : '+ Add member';
+  $('#setup-finish-btn').disabled = state.members.length === 0;
+}
+
+async function finishSetup() {
+  if (state.members.length === 0) return;
+  await sset(KEY.initialized, true, true);
+  showScreen('login');
+  renderLoginPicker();
+}
+
+/* ============================================================
+ *  LOGIN
+ * ============================================================ */
+function renderLoginPicker() {
+  $('#login-member-picker').classList.remove('hidden');
+  $('#login-pin-entry').classList.add('hidden');
+  $('#login-subtitle').textContent = "Who's logging in?";
+  const tiles = $('#login-tiles');
+  tiles.innerHTML = state.members.map(m => `
+    <div class="member-tile" onclick="selectLoginMember('${m.id}')">
+      <div class="ring">${escapeHtml(initials(m.name))}</div>
+      <div class="nm">${escapeHtml(m.name)}</div>
+      <div class="rl">${escapeHtml(m.role)}</div>
+    </div>
+  `).join('');
+}
+
+function selectLoginMember(id) {
+  state.loginMemberId = id;
+  state.pinBuffer = '';
+  state.pinMode = 'login';
+  $('#login-member-picker').classList.add('hidden');
+  $('#login-pin-entry').classList.remove('hidden');
+  const m = getMember(id);
+  $('#login-subtitle').textContent = `Enter PIN for ${m.name}`;
+  $('#pin-error').textContent = '';
+  refreshPinDots();
+}
+
+function loginBack() {
+  state.pinBuffer = '';
+  state.loginMemberId = null;
+  renderLoginPicker();
+}
+
+function pinPress(d) {
+  if (state.pinBuffer.length >= 4) return;
+  state.pinBuffer += d;
+  refreshPinDots();
+  if (state.pinBuffer.length === 4) {
+    setTimeout(submitPin, 150);
+  }
+}
+
+function pinDelete() {
+  state.pinBuffer = state.pinBuffer.slice(0, -1);
+  refreshPinDots();
+  $('#pin-error').textContent = '';
+}
+
+function refreshPinDots() {
+  $$('.pin-dot').forEach((d, i) => {
+    d.classList.toggle('filled', i < state.pinBuffer.length);
+  });
+}
+
+async function submitPin() {
+  const m = getMember(state.loginMemberId);
+  if (!m) return;
+  if (state.pinMode === 'login') {
+    if (state.pinBuffer === m.pin) {
+      state.currentMember = m.id;
+      await saveCurrentUser();
+      state.pinBuffer = '';
+      goto('dashboard');
+      setSyncStatus('idle');
+      pullAndMaybeApply().catch(()=>{});
+    } else {
+      $('#pin-error').textContent = 'Wrong PIN. Try again.';
+      state.pinBuffer = '';
+      setTimeout(refreshPinDots, 200);
+      // shake
+      $('.pin-display').animate(
+        [{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],
+        {duration:300}
+      );
+    }
+  }
+}
+
+async function logout() {
+  state.currentMember = null;
+  await sdel(KEY.currentUser, false);
+  state.pinBuffer = '';
+  state.loginMemberId = null;
+  showScreen('login');
+  renderLoginPicker();
+}
+
+async function fullSignOut() {
+  if (!confirm('Sign out of Microsoft on this device?\n\nYou\'ll need to sign in again to sync with OneDrive.')) return;
+  // Clear PIN session first
+  state.currentMember = null;
+  await sdel(KEY.currentUser, false);
+  // Then redirect to Microsoft sign-out (page will reload)
+  await microsoftSignOut();
+}
+
+async function changePin() {
+  const m = getMember(state.currentMember);
+  if (!m) return;
+  openSheet(`
+    <h2>Change PIN</h2>
+    <div class="field">
+      <label>Current PIN</label>
+      <input type="password" inputmode="numeric" maxlength="4" id="cur-pin" placeholder="••••" />
+    </div>
+    <div class="field">
+      <label>New 4-digit PIN</label>
+      <input type="password" inputmode="numeric" maxlength="4" id="new-pin" placeholder="••••" />
+    </div>
+    <button class="btn btn-primary btn-block btn-lg" onclick="submitChangePin()">Update PIN</button>
+  `);
+}
+
+async function submitChangePin() {
+  const m = getMember(state.currentMember);
+  const cur = $('#cur-pin').value;
+  const nw = $('#new-pin').value;
+  if (cur !== m.pin) { toast('Current PIN is wrong'); return; }
+  if (!/^\d{4}$/.test(nw)) { toast('New PIN must be 4 digits'); return; }
+  m.pin = nw;
+  await saveMembers();
+  closeSheet();
+  toast('PIN updated');
+}
+
+/* ============================================================
+ *  DASHBOARD
+ * ============================================================ */
+function renderDashboard() {
+  const me = getMember(state.currentMember);
+  if (!me) return;
+  $('#user-name').textContent = me.name.split(' ')[0];
+  $('#user-avatar').textContent = initials(me.name);
+  $('#user-avatar-2').textContent = initials(me.name);
+  $('#user-avatar-3').textContent = initials(me.name);
+  $('#user-avatar-4').textContent = initials(me.name);
+
+  // Totals
+  const monthlyIncome = state.members.reduce((s, m) => {
+    const im = (state.income[m.id] || {})[thisMonth()];
+    return s + Number(im || m.monthly_income || 0);
+  }, 0);
+  const monthlyLoan = state.loans.filter(l => l.status === 'Active')
+                                  .reduce((s, l) => s + Number(l.monthly_payment || 0), 0);
+  const outstanding = state.loans.filter(l => l.status === 'Active')
+                                  .reduce((s, l) => s + Number(l.outstanding_balance || 0), 0);
+  const savBal = state.savings.reduce((s, x) => s + (x.type === 'Deposit' ? Number(x.amount) : -Number(x.amount)), 0);
+
+  // By house
+  const vidhuvaru = state.expenses.filter(e => e.house === "Vidhuvaru").reduce((s, e) => s + Number(e.amount), 0);
+  const island = state.expenses.filter(e => e.house === 'Island').reduce((s, e) => s + Number(e.amount), 0);
+
+  $('#dash-net').textContent = fmt(savBal - outstanding);
+  $('#dash-savings').textContent = fmt(savBal);
+  $('#dash-outstanding').textContent = fmt(outstanding);
+  $('#dash-income').textContent = 'MVR ' + fmt(monthlyIncome);
+  $('#dash-loan-pmt').textContent = 'MVR ' + fmt(monthlyLoan);
+  $('#dash-vidhuvaru').textContent = 'MVR ' + fmt(vidhuvaru);
+  $('#dash-island').textContent = 'MVR ' + fmt(island);
+
+  // Recent activity (last 5 expenses)
+  const recent = [...state.expenses].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+  const recentEl = $('#dash-recent');
+  if (recent.length === 0) {
+    recentEl.innerHTML = `<div class="empty"><div class="em-icon">📋</div><p>No activity yet</p><p>Tap + to log your first expense</p></div>`;
+  } else {
+    recentEl.innerHTML = recent.map(e => rowExpense(e)).join('');
+  }
+
+  // Per-member view
+  $('#dash-members').innerHTML = state.members.map(m => {
+    const inc = (state.income[m.id] || {})[thisMonth()] || m.monthly_income || 0;
+    const loanPmt = state.loans.filter(l => l.borrower === m.id && l.status === 'Active')
+                               .reduce((s, l) => s + Number(l.monthly_payment || 0), 0);
+    const net = Number(inc) - loanPmt;
+    return `
+      <div class="member-bar">
+        <div class="ring">${escapeHtml(initials(m.name))}</div>
+        <div class="info">
+          <div class="nm">${escapeHtml(m.name)}</div>
+          <div class="ln">In ${escapeHtml(fmt(inc))} · Loan ${escapeHtml(fmt(loanPmt))}</div>
+        </div>
+        <div class="net ${net >= 0 ? 'text-success' : 'text-danger'}">${net >= 0 ? '+' : ''}${fmt(net)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function rowExpense(e) {
+  return `
+    <div class="row" onclick="editExpense('${e.id}')">
+      <div class="icon">${CAT_ICON[e.category] || '📦'}</div>
+      <div class="body">
+        <div class="t">${escapeHtml(e.description || e.category)}</div>
+        <div class="s">${escapeHtml(e.date)} · ${escapeHtml(e.house)} · ${escapeHtml(memberName(e.paid_by))}</div>
+      </div>
+      <div class="amt neg">−${fmt(e.amount)}</div>
+    </div>
+  `;
+}
+
+/* ============================================================
+ *  EXPENSES VIEW
+ * ============================================================ */
+function renderExpenses() {
+  let list = state.expenses;
+  if (state.expFilter !== 'all') list = list.filter(e => e.house === state.expFilter);
+
+  const monthTotal = list.filter(e => e.date.startsWith(thisMonth())).reduce((s, e) => s + Number(e.amount), 0);
+  const total = list.reduce((s, e) => s + Number(e.amount), 0);
+
+  $('#exp-month-total').textContent = 'MVR ' + fmt(monthTotal);
+  $('#exp-total').textContent = 'MVR ' + fmt(total);
+
+  // By category
+  const byCat = {};
+  list.forEach(e => { byCat[e.category] = (byCat[e.category] || 0) + Number(e.amount); });
+  const sortedCats = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const catWrap = $('#exp-by-cat');
+  if (sortedCats.length === 0) {
+    catWrap.innerHTML = `<div class="empty"><div class="em-icon">🧮</div><p>No expenses yet</p></div>`;
+  } else {
+    catWrap.innerHTML = sortedCats.map(([cat, amt]) => `
+      <div class="row">
+        <div class="icon">${CAT_ICON[cat] || '📦'}</div>
+        <div class="body">
+          <div class="t">${escapeHtml(cat)}</div>
+          <div class="s">${((amt / total) * 100).toFixed(0)}% of total</div>
+        </div>
+        <div class="amt">${fmt(amt)}</div>
+      </div>
+    `).join('');
+  }
+
+  // All
+  const sorted = [...list].sort((a, b) => b.date.localeCompare(a.date));
+  const lst = $('#exp-list');
+  if (sorted.length === 0) {
+    lst.innerHTML = `<div class="empty"><div class="em-icon">📋</div><p>No expenses to show</p><p>Tap + to add one</p></div>`;
+  } else {
+    lst.innerHTML = sorted.map(rowExpense).join('');
+  }
+}
+
+function filterExpenses(filter) {
+  state.expFilter = filter;
+  $$('#screen-expenses .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === filter));
+  renderExpenses();
+}
+
+/* ============================================================
+ *  LOANS VIEW
+ * ============================================================ */
+function renderLoans() {
+  const active = state.loans.filter(l => l.status === 'Active');
+  const out = active.reduce((s, l) => s + Number(l.outstanding_balance || 0), 0);
+  const orig = active.reduce((s, l) => s + Number(l.original_amount || 0), 0);
+  const monthly = active.reduce((s, l) => s + Number(l.monthly_payment || 0), 0);
+
+  $('#loans-out').textContent = fmt(out);
+  $('#loans-paid').textContent = fmt(orig - out);
+  $('#loans-monthly').textContent = fmt(monthly);
+  $('#loans-count').textContent = active.length;
+
+  const wrap = $('#loans-list');
+  if (state.loans.length === 0) {
+    wrap.innerHTML = `<div class="card"><div class="empty"><div class="em-icon">💳</div><p>No loans tracked</p><p>Tap + to add a loan</p></div></div>`;
+    return;
+  }
+  wrap.innerHTML = state.loans.map(l => {
+    const paid = Number(l.original_amount) - Number(l.outstanding_balance);
+    const pct = l.original_amount > 0 ? Math.min(100, Math.max(0, (paid / l.original_amount) * 100)) : 0;
+    const statusChip = {
+      'Active': 'blue',
+      'Paid Off': 'green',
+      'Defaulted': 'red',
+      'On Hold': 'gold'
+    }[l.status] || '';
+    return `
+      <div class="card loan-card mb-2" onclick="editLoan('${l.id}')">
+        <div class="head">
+          <div>
+            <div class="name">${escapeHtml(l.lender)} <span class="text-muted" style="font-weight:500;">· ${escapeHtml(l.purpose)}</span></div>
+            <div class="meta">${escapeHtml(memberName(l.borrower))} · ${escapeHtml(l.id)}</div>
+          </div>
+          <span class="chip ${statusChip}">${escapeHtml(l.status)}</span>
+        </div>
+        <div class="bal">MVR ${fmt(l.outstanding_balance)}</div>
+        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+        <div class="foot">
+          <span>${pct.toFixed(0)}% paid · MVR ${fmt(l.monthly_payment)}/mo</span>
+          <span>${escapeHtml(l.interest_rate || 0)}% APR</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ============================================================
+ *  SAVINGS VIEW
+ * ============================================================ */
+function renderSavings() {
+  const dep = state.savings.filter(s => s.type === 'Deposit').reduce((a, s) => a + Number(s.amount), 0);
+  const wd = state.savings.filter(s => s.type === 'Withdrawal').reduce((a, s) => a + Number(s.amount), 0);
+  $('#sav-bal').textContent = fmt(dep - wd);
+  $('#sav-dep').textContent = fmt(dep);
+  $('#sav-wd').textContent = fmt(wd);
+
+  const sorted = [...state.savings].sort((a, b) => b.date.localeCompare(a.date));
+  const wrap = $('#sav-list');
+  if (sorted.length === 0) {
+    wrap.innerHTML = `<div class="empty"><div class="em-icon">🏦</div><p>No savings activity</p><p>Tap + to add a deposit</p></div>`;
+    return;
+  }
+  wrap.innerHTML = sorted.map(s => `
+    <div class="row" onclick="editSavings('${s.id}')">
+      <div class="icon">${s.type === 'Deposit' ? '⬆️' : '⬇️'}</div>
+      <div class="body">
+        <div class="t">${escapeHtml(s.purpose || s.type)}</div>
+        <div class="s">${escapeHtml(s.date)} · ${escapeHtml(s.account)} · ${escapeHtml(memberName(s.contributor))}</div>
+      </div>
+      <div class="amt ${s.type === 'Deposit' ? 'pos' : 'neg'}">${s.type === 'Deposit' ? '+' : '−'}${fmt(s.amount)}</div>
+    </div>
+  `).join('');
+}
+
+/* ============================================================
+ *  MORE VIEW
+ * ============================================================ */
+function renderMore() {
+  const me = getMember(state.currentMember);
+  if (!me) return;
+  $('#more-avatar').textContent = initials(me.name);
+  $('#more-name').textContent = me.name;
+  $('#more-role').textContent = `${me.role} · Lives in ${me.lives_in}`;
+
+  // Income grid for current user, current year
+  const year = new Date().getFullYear();
+  const incForMe = state.income[me.id] || {};
+  const grid = $('#more-income-grid');
+  grid.innerHTML = MONTHS.map((m, i) => {
+    const key = `${year}-${String(i + 1).padStart(2, '0')}`;
+    const val = incForMe[key];
+    return `
+      <div class="month-cell ${val ? 'has' : ''}" onclick="editIncome('${key}')">
+        <div class="m">${m}</div>
+        <div class="a">${val ? fmt(val) : '—'}</div>
+      </div>
+    `;
+  }).join('');
+
+  // Members list
+  const isHead = me.role === 'Head';
+  $('#more-add-link').style.display = isHead && state.members.length < 6 ? '' : 'none';
+  $('#more-members-list').innerHTML = state.members.map(m => `
+    <div class="member-bar" onclick="${isHead ? `editMember('${m.id}')` : ''}">
+      <div class="ring">${escapeHtml(initials(m.name))}</div>
+      <div class="info">
+        <div class="nm">${escapeHtml(m.name)}${m.id === me.id ? ' <span class="chip" style="margin-left:6px;">You</span>' : ''}</div>
+        <div class="ln">${escapeHtml(m.role)} · ${escapeHtml(m.lives_in)}${m.working ? ' · Works' : ''}</div>
+      </div>
+      ${isHead && m.id !== me.id ? `<div class="text-muted" style="font-size:18px;">›</div>` : ''}
+    </div>
+  `).join('');
+
+  // Cloud card
+  renderCloudCard();
+}
+
+/* ============================================================
+ *  SHEET (BOTTOM MODAL) HELPERS
+ * ============================================================ */
+function openSheet(html) {
+  $('#sheet-content').innerHTML = html;
+  $('#sheet').classList.add('open');
+  $('#sheet-overlay').classList.add('open');
+  document.body.classList.add('locked');
+}
+function closeSheet() {
+  $('#sheet').classList.remove('open');
+  $('#sheet-overlay').classList.remove('open');
+  document.body.classList.remove('locked');
+}
+
+/* ============================================================
+ *  EXPENSE FORM
+ * ============================================================ */
+function openExpenseSheet(id) {
+  const isEdit = !!id;
+  const e = isEdit ? state.expenses.find(x => x.id === id) : {
+    id: uid(), date: today(), house: getMember(state.currentMember)?.lives_in || "Vidhuvaru",
+    category: 'Groceries', description: '', paid_by: state.currentMember, amount: '', notes: ''
+  };
+  openSheet(`
+    <h2>${isEdit ? 'Edit expense' : 'Log expense'}</h2>
+    <div class="field-row">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="f-date" value="${e.date}" />
+      </div>
+      <div class="field">
+        <label>Amount (MVR)</label>
+        <input type="number" inputmode="decimal" id="f-amount" value="${e.amount}" placeholder="0" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>House</label>
+        <select id="f-house">
+          ${HOUSES.map(h => `<option ${h === e.house ? 'selected' : ''}>${h}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Category</label>
+        <select id="f-category">
+          ${CATEGORIES.map(c => `<option ${c === e.category ? 'selected' : ''}>${c}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Paid by</label>
+      <select id="f-paid">
+        ${state.members.map(m => `<option value="${m.id}" ${m.id === e.paid_by ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <input type="text" id="f-desc" value="${escapeHtml(e.description)}" placeholder="e.g. Weekly groceries" />
+    </div>
+    <div class="field">
+      <label>Notes (optional)</label>
+      <textarea id="f-notes">${escapeHtml(e.notes)}</textarea>
+    </div>
+    <div class="flex gap-2">
+      ${isEdit ? `<button class="btn btn-danger grow" onclick="deleteExpense('${e.id}')">Delete</button>` : ''}
+      <button class="btn btn-ghost grow" onclick="closeSheet()">Cancel</button>
+      <button class="btn btn-primary grow" onclick="saveExpense('${e.id}', ${isEdit})">Save</button>
+    </div>
+  `);
+}
+
+async function saveExpense(id, isEdit) {
+  const amount = parseFloat($('#f-amount').value);
+  if (!amount || amount <= 0) { toast('Enter a valid amount'); return; }
+  const obj = {
+    id,
+    date: $('#f-date').value,
+    house: $('#f-house').value,
+    category: $('#f-category').value,
+    description: $('#f-desc').value.trim(),
+    paid_by: $('#f-paid').value,
+    amount: amount,
+    notes: $('#f-notes').value.trim()
+  };
+  if (isEdit) {
+    const i = state.expenses.findIndex(x => x.id === id);
+    state.expenses[i] = obj;
+  } else {
+    state.expenses.push(obj);
+  }
+  await saveExpenses();
+  closeSheet();
+  toast(isEdit ? 'Updated' : 'Logged');
+  if (state.view === 'dashboard') renderDashboard();
+  if (state.view === 'expenses') renderExpenses();
+}
+
+function editExpense(id) { openExpenseSheet(id); }
+
+async function deleteExpense(id) {
+  if (!confirm('Delete this expense?')) return;
+  state.expenses = state.expenses.filter(e => e.id !== id);
+  await saveExpenses();
+  closeSheet();
+  toast('Deleted');
+  if (state.view === 'dashboard') renderDashboard();
+  if (state.view === 'expenses') renderExpenses();
+}
+
+/* ============================================================
+ *  LOAN FORM
+ * ============================================================ */
+function openLoanSheet(id) {
+  const isEdit = !!id;
+  const l = isEdit ? state.loans.find(x => x.id === id) : {
+    id: 'L' + String(state.loans.length + 1).padStart(2, '0'),
+    lender: '', borrower: state.currentMember, purpose: '',
+    original_amount: '', outstanding_balance: '', monthly_payment: '',
+    interest_rate: '', start_date: today(), end_date: '', status: 'Active', notes: ''
+  };
+  openSheet(`
+    <h2>${isEdit ? 'Edit loan' : 'Add loan'}</h2>
+    <div class="field-row">
+      <div class="field">
+        <label>Loan ID</label>
+        <input type="text" id="l-id" value="${escapeHtml(l.id)}" ${isEdit ? 'disabled' : ''} />
+      </div>
+      <div class="field">
+        <label>Lender</label>
+        <input type="text" id="l-lender" value="${escapeHtml(l.lender)}" placeholder="e.g. BML" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Borrower</label>
+      <select id="l-borrower">
+        ${state.members.map(m => `<option value="${m.id}" ${m.id === l.borrower ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field">
+      <label>Purpose</label>
+      <input type="text" id="l-purpose" value="${escapeHtml(l.purpose)}" placeholder="e.g. Home loan" />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Original (MVR)</label>
+        <input type="number" id="l-orig" value="${l.original_amount}" />
+      </div>
+      <div class="field">
+        <label>Outstanding (MVR)</label>
+        <input type="number" id="l-out" value="${l.outstanding_balance}" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Monthly Pmt</label>
+        <input type="number" id="l-pmt" value="${l.monthly_payment}" />
+      </div>
+      <div class="field">
+        <label>Interest %</label>
+        <input type="number" id="l-rate" value="${l.interest_rate}" step="0.01" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Start</label>
+        <input type="date" id="l-start" value="${l.start_date}" />
+      </div>
+      <div class="field">
+        <label>End</label>
+        <input type="date" id="l-end" value="${l.end_date}" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Status</label>
+      <select id="l-status">
+        ${['Active','Paid Off','Defaulted','On Hold'].map(s => `<option ${s === l.status ? 'selected' : ''}>${s}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="l-notes">${escapeHtml(l.notes)}</textarea>
+    </div>
+    <div class="flex gap-2">
+      ${isEdit ? `<button class="btn btn-danger grow" onclick="deleteLoan('${l.id}')">Delete</button>` : ''}
+      <button class="btn btn-ghost grow" onclick="closeSheet()">Cancel</button>
+      <button class="btn btn-primary grow" onclick="saveLoan('${l.id}', ${isEdit})">Save</button>
+    </div>
+  `);
+}
+
+async function saveLoan(id, isEdit) {
+  const newId = isEdit ? id : ($('#l-id').value.trim() || id);
+  const obj = {
+    id: newId,
+    lender: $('#l-lender').value.trim(),
+    borrower: $('#l-borrower').value,
+    purpose: $('#l-purpose').value.trim(),
+    original_amount: parseFloat($('#l-orig').value) || 0,
+    outstanding_balance: parseFloat($('#l-out').value) || 0,
+    monthly_payment: parseFloat($('#l-pmt').value) || 0,
+    interest_rate: parseFloat($('#l-rate').value) || 0,
+    start_date: $('#l-start').value,
+    end_date: $('#l-end').value,
+    status: $('#l-status').value,
+    notes: $('#l-notes').value.trim()
+  };
+  if (!obj.lender) { toast('Enter a lender'); return; }
+  if (isEdit) {
+    const i = state.loans.findIndex(x => x.id === id);
+    state.loans[i] = obj;
+  } else {
+    state.loans.push(obj);
+  }
+  await saveLoans();
+  closeSheet();
+  toast(isEdit ? 'Updated' : 'Added');
+  if (state.view === 'loans') renderLoans();
+  if (state.view === 'dashboard') renderDashboard();
+}
+
+function editLoan(id) { openLoanSheet(id); }
+
+async function deleteLoan(id) {
+  if (!confirm('Delete this loan?')) return;
+  state.loans = state.loans.filter(l => l.id !== id);
+  await saveLoans();
+  closeSheet();
+  toast('Deleted');
+  if (state.view === 'loans') renderLoans();
+  if (state.view === 'dashboard') renderDashboard();
+}
+
+/* ============================================================
+ *  SAVINGS FORM
+ * ============================================================ */
+function openSavingsSheet(id) {
+  const isEdit = !!id;
+  const s = isEdit ? state.savings.find(x => x.id === id) : {
+    id: uid(), date: today(), account: 'Joint Bank Account',
+    contributor: state.currentMember, type: 'Deposit', amount: '',
+    purpose: '', notes: ''
+  };
+  openSheet(`
+    <h2>${isEdit ? 'Edit transaction' : 'Add transaction'}</h2>
+    <div class="field-row">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="s-date" value="${s.date}" />
+      </div>
+      <div class="field">
+        <label>Amount (MVR)</label>
+        <input type="number" id="s-amount" value="${s.amount}" placeholder="0" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Type</label>
+        <select id="s-type">
+          <option ${s.type === 'Deposit' ? 'selected' : ''}>Deposit</option>
+          <option ${s.type === 'Withdrawal' ? 'selected' : ''}>Withdrawal</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Contributor</label>
+        <select id="s-contrib">
+          ${state.members.map(m => `<option value="${m.id}" ${m.id === s.contributor ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Account / Place</label>
+      <input type="text" id="s-account" value="${escapeHtml(s.account)}" placeholder="e.g. Joint Bank Account" />
+    </div>
+    <div class="field">
+      <label>Purpose / Goal</label>
+      <input type="text" id="s-purpose" value="${escapeHtml(s.purpose)}" placeholder="e.g. Emergency fund, Hajj" />
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="s-notes">${escapeHtml(s.notes)}</textarea>
+    </div>
+    <div class="flex gap-2">
+      ${isEdit ? `<button class="btn btn-danger grow" onclick="deleteSavings('${s.id}')">Delete</button>` : ''}
+      <button class="btn btn-ghost grow" onclick="closeSheet()">Cancel</button>
+      <button class="btn btn-primary grow" onclick="saveSavingsRec('${s.id}', ${isEdit})">Save</button>
+    </div>
+  `);
+}
+
+async function saveSavingsRec(id, isEdit) {
+  const amount = parseFloat($('#s-amount').value);
+  if (!amount || amount <= 0) { toast('Enter a valid amount'); return; }
+  const obj = {
+    id,
+    date: $('#s-date').value,
+    account: $('#s-account').value.trim(),
+    contributor: $('#s-contrib').value,
+    type: $('#s-type').value,
+    amount,
+    purpose: $('#s-purpose').value.trim(),
+    notes: $('#s-notes').value.trim()
+  };
+  if (isEdit) {
+    const i = state.savings.findIndex(x => x.id === id);
+    state.savings[i] = obj;
+  } else {
+    state.savings.push(obj);
+  }
+  await saveSavings();
+  closeSheet();
+  toast(isEdit ? 'Updated' : 'Added');
+  if (state.view === 'savings') renderSavings();
+  if (state.view === 'dashboard') renderDashboard();
+}
+
+function editSavings(id) { openSavingsSheet(id); }
+
+async function deleteSavings(id) {
+  if (!confirm('Delete this transaction?')) return;
+  state.savings = state.savings.filter(s => s.id !== id);
+  await saveSavings();
+  closeSheet();
+  toast('Deleted');
+  if (state.view === 'savings') renderSavings();
+  if (state.view === 'dashboard') renderDashboard();
+}
+
+/* ============================================================
+ *  MEMBER FORM
+ * ============================================================ */
+function openMemberSheet(id) {
+  const isEdit = !!id;
+  const isSetup = state.members.length === 0 || (state.view !== 'more' && !state.currentMember);
+  const m = isEdit ? state.members.find(x => x.id === id) : {
+    id: uid(), name: '',
+    role: state.members.length === 0 ? 'Head' : 'Other',
+    working: true, workplace: '', lives_in: "Vidhuvaru",
+    monthly_income: 0, contribution: 0, notes: '', pin: ''
+  };
+  openSheet(`
+    <h2>${isEdit ? 'Edit member' : 'Add member'}</h2>
+    <div class="field">
+      <label>Full name</label>
+      <input type="text" id="m-name" value="${escapeHtml(m.name)}" placeholder="e.g. Ahmed Hassan" />
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Role</label>
+        <select id="m-role">
+          ${ROLES.map(r => `<option ${r === m.role ? 'selected' : ''}>${r}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Lives in</label>
+        <select id="m-lives">
+          ${HOUSES.map(h => `<option ${h === m.lives_in ? 'selected' : ''}>${h}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Working?</label>
+        <select id="m-working">
+          <option value="yes" ${m.working ? 'selected' : ''}>Yes</option>
+          <option value="no" ${!m.working ? 'selected' : ''}>No</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Workplace</label>
+        <input type="text" id="m-workplace" value="${escapeHtml(m.workplace)}" placeholder="(optional)" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Monthly income (MVR)</label>
+        <input type="number" id="m-income" value="${m.monthly_income || ''}" placeholder="0" />
+      </div>
+      <div class="field">
+        <label>Contribution (MVR)</label>
+        <input type="number" id="m-contrib" value="${m.contribution || ''}" placeholder="0" />
+      </div>
+    </div>
+    <div class="field">
+      <label>4-digit PIN ${isEdit ? '(leave blank to keep current)' : ''}</label>
+      <input type="password" inputmode="numeric" maxlength="4" id="m-pin" value="" placeholder="••••" />
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="m-notes">${escapeHtml(m.notes)}</textarea>
+    </div>
+    <div class="flex gap-2">
+      ${isEdit && state.members.length > 1 ? `<button class="btn btn-danger grow" onclick="deleteMember('${m.id}')">Remove</button>` : ''}
+      <button class="btn btn-ghost grow" onclick="closeSheet()">Cancel</button>
+      <button class="btn btn-primary grow" onclick="saveMember('${m.id}', ${isEdit})">Save</button>
+    </div>
+  `);
+}
+
+async function saveMember(id, isEdit) {
+  const name = $('#m-name').value.trim();
+  if (!name) { toast('Enter a name'); return; }
+  const pin = $('#m-pin').value;
+  if (!isEdit && !/^\d{4}$/.test(pin)) { toast('PIN must be 4 digits'); return; }
+  if (isEdit && pin && !/^\d{4}$/.test(pin)) { toast('PIN must be 4 digits'); return; }
+
+  const existing = isEdit ? state.members.find(x => x.id === id) : null;
+  const obj = {
+    id,
+    name,
+    role: $('#m-role').value,
+    working: $('#m-working').value === 'yes',
+    workplace: $('#m-workplace').value.trim(),
+    lives_in: $('#m-lives').value,
+    monthly_income: parseFloat($('#m-income').value) || 0,
+    contribution: parseFloat($('#m-contrib').value) || 0,
+    notes: $('#m-notes').value.trim(),
+    pin: pin || (existing ? existing.pin : '')
+  };
+  if (isEdit) {
+    const i = state.members.findIndex(x => x.id === id);
+    state.members[i] = obj;
+  } else {
+    state.members.push(obj);
+  }
+  await saveMembers();
+  closeSheet();
+  toast(isEdit ? 'Updated' : 'Added');
+  if (state.view === 'more') renderMore();
+  if (state.view === 'dashboard') renderDashboard();
+  if ($('#setup-step-2') && !$('#setup-step-2').classList.contains('hidden')) {
+    renderSetupMembers();
+  }
+}
+
+function editMember(id) { openMemberSheet(id); }
+
+async function deleteMember(id) {
+  if (id === state.currentMember) { toast("You can't remove yourself"); return; }
+  if (!confirm('Remove this member? Their expense/loan history stays.')) return;
+  state.members = state.members.filter(m => m.id !== id);
+  await saveMembers();
+  closeSheet();
+  toast('Removed');
+  if (state.view === 'more') renderMore();
+}
+
+/* ============================================================
+ *  INCOME EDIT
+ * ============================================================ */
+function editIncome(monthKey) {
+  const me = getMember(state.currentMember);
+  const current = (state.income[me.id] || {})[monthKey] || '';
+  const [y, m] = monthKey.split('-');
+  const label = `${MONTHS[parseInt(m) - 1]} ${y}`;
+  openSheet(`
+    <h2>Income for ${label}</h2>
+    <p class="text-muted" style="font-size:13px; margin: -10px 0 16px;">${escapeHtml(me.name)}'s income for this month.</p>
+    <div class="field">
+      <label>Amount (MVR)</label>
+      <input type="number" id="inc-amt" value="${current}" placeholder="0" autofocus />
+    </div>
+    <div class="flex gap-2">
+      <button class="btn btn-ghost grow" onclick="closeSheet()">Cancel</button>
+      <button class="btn btn-primary grow" onclick="saveIncomeMonth('${monthKey}')">Save</button>
+    </div>
+  `);
+}
+
+async function saveIncomeMonth(monthKey) {
+  const me = getMember(state.currentMember);
+  const amt = parseFloat($('#inc-amt').value);
+  if (!state.income[me.id]) state.income[me.id] = {};
+  if (!amt || amt <= 0) {
+    delete state.income[me.id][monthKey];
+  } else {
+    state.income[me.id][monthKey] = amt;
+  }
+  await saveIncome();
+  closeSheet();
+  toast('Saved');
+  renderMore();
+}
+
+/* ============================================================
+ *  DATA EXPORT / RESET
+ * ============================================================ */
+function exportData() {
+  const data = {
+    exported_at: new Date().toISOString(),
+    members: state.members,
+    expenses: state.expenses,
+    loans: state.loans,
+    savings: state.savings,
+    income: state.income
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `vidhuvaru-backup-${today()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Backup downloaded');
+}
+
+async function resetApp() {
+  const me = getMember(state.currentMember);
+  if (me?.role !== 'Head') { toast('Only the Head can reset'); return; }
+  if (!confirm('⚠️ Erase ALL family data permanently? This cannot be undone.')) return;
+  if (!confirm('Are you absolutely sure? Type-confirm by clicking OK.')) return;
+  await sdel(KEY.members);
+  await sdel(KEY.expenses);
+  await sdel(KEY.loans);
+  await sdel(KEY.savings);
+  await sdel(KEY.income);
+  await sdel(KEY.initialized);
+  await sdel(KEY.currentUser, false);
+  state.members = []; state.expenses = []; state.loans = [];
+  state.savings = []; state.income = {}; state.currentMember = null;
+  toast('Reset complete');
+  $('#setup-step-1').classList.remove('hidden');
+  $('#setup-step-2').classList.add('hidden');
+  showScreen('setup');
+}
+
+/* ============================================================
+ *  BOOT
+ * ============================================================ */
+async function init() {
+  // Hide all screens during boot
+  $$('.screen').forEach(s => s.classList.remove('active'));
+
+  // Remember if user previously chose local-only
+  localOnly = await sget('app:localOnly', true, false);
+
+  // 1. Initialize Microsoft auth (skipped if local-only chosen)
+  const msalResult = localOnly
+    ? { ok: true, signedIn: false }
+    : await initMsal();
+
+  // 2. Load whatever's in localStorage (instant UI for offline / returning users)
+  await loadState();
+
+  // 3. If not local-only AND (MSAL not configured or not signed in) → show sign-in screen
+  if (!localOnly && (!msalResult.ok || !msalResult.signedIn)) {
+    if (msalResult.reason === 'not-configured') {
+      document.getElementById('signin-config-warning')?.classList.remove('hidden');
+    } else if (msalResult.reason === 'init-error' && msalResult.error) {
+      const errMsg = msalResult.error.errorMessage || msalResult.error.message || String(msalResult.error);
+      let hint = errMsg;
+      if (/AADSTS50011/i.test(errMsg) || /redirect.?uri/i.test(errMsg)) {
+        hint = `Redirect URI mismatch. In Azure → your app → Authentication, add this exact URL as a Single-page application redirect URI:\n${window.location.origin + window.location.pathname}`;
+      } else if (/AADSTS9002326|AADSTS90072/i.test(errMsg)) {
+        hint = 'Account type mismatch. In Azure → your app → Authentication, change "Supported account types" to include personal Microsoft accounts.';
+      }
+      showSigninError(hint);
+    }
+    // Warn if running from file:// — OAuth requires http/https
+    if (window.location.protocol === 'file:') {
+      showSigninError("This app must be deployed (e.g. to Vercel) — Microsoft sign-in won't work when opening the file directly. For now, tap 'Use without cloud sync' to try the app.");
+    }
+    showScreen('signin');
+    return;
+  }
+
+  // 4. Signed in (or local-only) — if no local members, try to pull from cloud
+  if (state.members.length === 0 && currentAccount) {
+    const pullResult = await performPull();
+    if (pullResult && pullResult.found && pullResult.snapshot) {
+      await applySnapshot(pullResult.snapshot);
+    }
+  }
+
+  // 5. Route based on state
+  if (state.members.length === 0) {
+    showScreen('setup');
+  } else if (!state.currentMember) {
+    showScreen('login');
+    renderLoginPicker();
+  } else {
+    goto('dashboard');
+    setSyncStatus(localOnly ? 'offline' : 'idle');
+    if (currentAccount) {
+      pullAndMaybeApply().catch(()=>{});
+    }
+  }
+}
+
+// Hide all screens initially
+$$('.screen').forEach(s => s.classList.remove('active'));
+init();
+</script>
+</body>
+</html>
