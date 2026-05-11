@@ -14,8 +14,8 @@
 <meta name="description" content="Vidhuvaru — family finance tracker for 6 members across two homes" />
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 
-<!-- Microsoft Authentication Library -->
-<script src="https://alcdn.msauth.net/browser/2.38.4/js/msal-browser.min.js"></script>
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -583,8 +583,8 @@
   .cloud-status-pill.warn .dot { animation: syncpulse 1.2s ease-in-out infinite; }
   .cloud-status-pill.muted { background: var(--bg-2); color: var(--muted); }
 
-  /* Microsoft sign-in button */
-  .btn-microsoft {
+  /* Google sign-in button */
+  .btn-google {
     background: white;
     color: #1a2231;
     border: 1px solid var(--line-2);
@@ -600,9 +600,9 @@
     font-family: inherit;
     transition: background .15s ease, transform .1s ease;
   }
-  .btn-microsoft:hover { background: var(--bg-2); }
-  .btn-microsoft:active { transform: scale(0.97); }
-  .btn-microsoft svg { width: 18px; height: 18px; }
+  .btn-google:hover { background: var(--bg-2); }
+  .btn-google:active { transform: scale(0.97); }
+  .btn-google svg { width: 18px; height: 18px; }
 
   /* Sign-in screen extras */
   .signin-features {
@@ -750,20 +750,20 @@
     </div>
 
     <div class="card" style="padding: 22px;">
-      <button class="btn-microsoft btn-block" onclick="signIn()" id="signin-btn">
-        <svg viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
-          <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-          <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-          <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-          <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+      <button class="btn-google btn-block" onclick="signIn()" id="signin-btn">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
         </svg>
-        <span>Sign in with Microsoft</span>
+        <span>Sign in with Google</span>
       </button>
 
       <div id="signin-error" class="signin-error hidden"></div>
       <div id="signin-config-warning" class="signin-config-warning hidden">
         <strong>⚠ Not configured yet</strong>
-        The app's Microsoft Client ID hasn't been set. See the README for the 4-step setup, OR try the app first without sign-in (button below).
+        The app's Google Client ID hasn't been set. See the README for the setup, OR try the app first without sign-in (button below).
       </div>
 
       <div class="signin-divider"><span>or</span></div>
@@ -779,7 +779,7 @@
 
     <div class="signin-features">
       <div class="signin-feature"><div class="ic">📱</div><div>Add to your home screen — works like a real app</div></div>
-      <div class="signin-feature"><div class="ic">☁</div><div>Data syncs to <strong>your</strong> OneDrive — your account, your data</div></div>
+      <div class="signin-feature"><div class="ic">☁</div><div>Data syncs to <strong>your</strong> Google Drive — your account, your data</div></div>
       <div class="signin-feature"><div class="ic">👨‍👩‍👧</div><div>Each family member picks themselves with a 4-digit PIN</div></div>
     </div>
   </div>
@@ -1060,7 +1060,7 @@
       </div>
       <div class="row" onclick="fullSignOut()">
         <div class="icon">🔌</div>
-        <div class="body"><div class="t">Sign out of Microsoft</div><div class="s">Disconnects this device from OneDrive</div></div>
+        <div class="body"><div class="t">Sign out of Google</div><div class="s">Disconnects this device from Google Drive</div></div>
       </div>
       <div class="row" onclick="exportData()">
         <div class="icon">📤</div>
@@ -1253,44 +1253,39 @@ async function saveIncome()   { const r = await sset(KEY.income, state.income, t
 async function saveCurrentUser() { return sset(KEY.currentUser, state.currentMember, false); }
 
 /* ============================================================
- *  MICROSOFT AUTH (MSAL) + ONEDRIVE SYNC
+ *  GOOGLE AUTH + GOOGLE DRIVE SYNC
  * ============================================================ */
 
 // ★★★ CONFIGURATION — REPLACE BEFORE DEPLOYING ★★★
-// 1. Register an app at https://portal.azure.com (see README)
-// 2. Paste your "Application (client) ID" below
-// 3. In Azure, add your deployed URL as a Single-Page App redirect URI
-const AZURE_CLIENT_ID = 'YOUR_AZURE_CLIENT_ID_HERE';
+// 1. Create a project at https://console.cloud.google.com (see README)
+// 2. Enable Google Drive API
+// 3. Set up OAuth consent screen, add your Gmail as a test user
+// 4. Create OAuth Client ID (Web app), paste your deployed URL as redirect
+// 5. Copy the Client ID and paste it below
+const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID_HERE';
 // ★★★ END CONFIGURATION ★★★
 
-const MSAL_CONFIG = {
-  auth: {
-    clientId: AZURE_CLIENT_ID,
-    // 'consumers' = personal Microsoft accounts (outlook.com, hotmail.com, live.com)
-    // change to 'common' if you also want work/school accounts
-    authority: 'https://login.microsoftonline.com/consumers',
-    redirectUri: window.location.origin + window.location.pathname,
-  },
-  cache: {
-    cacheLocation: 'localStorage',
-    storeAuthStateInCookie: false,
-  }
-};
-
-const GRAPH_SCOPES = ['Files.ReadWrite', 'User.Read'];
+const GOOGLE_SCOPES = [
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
+  'openid'
+].join(' ');
 
 const CLOUD = {
   filename: 'vidhuvaru-data.json',
-  folder: 'Apps/Vidhuvaru',
-  filePath: 'Apps/Vidhuvaru/vidhuvaru-data.json',
-  graphBase: 'https://graph.microsoft.com/v1.0',
+  driveBase: 'https://www.googleapis.com/drive/v3',
+  uploadBase: 'https://www.googleapis.com/upload/drive/v3',
   debounceMs: 3000,
   retryMs: 30000,
 };
 
-let msalInstance = null;
-let currentAccount = null;
-let localOnly = false;  // when true, app works without Microsoft sign-in (no cloud sync)
+let tokenClient = null;
+let currentToken = null;
+let currentTokenExpiresAt = 0;
+let currentAccount = null;     // { email, name }
+let driveFileId = null;        // cached after first lookup
+let localOnly = false;
 
 const sync = {
   status: 'idle',
@@ -1303,73 +1298,47 @@ const sync = {
   suppressDirty: false,
 };
 
-/* ---------- MSAL initialization ---------- */
+/* ---------- Google Identity Services init ---------- */
 
-function isMsalConfigured() {
-  return AZURE_CLIENT_ID && AZURE_CLIENT_ID !== 'YOUR_AZURE_CLIENT_ID_HERE';
+function isGoogleConfigured() {
+  return GOOGLE_CLIENT_ID && GOOGLE_CLIENT_ID !== 'YOUR_GOOGLE_CLIENT_ID_HERE';
 }
 
-async function initMsal() {
-  if (!isMsalConfigured()) return { ok: false, reason: 'not-configured' };
-  if (typeof msal === 'undefined') return { ok: false, reason: 'library-not-loaded' };
+async function waitForGsi(maxMs = 4000) {
+  const start = Date.now();
+  while (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+    if (Date.now() - start > maxMs) return false;
+    await new Promise(r => setTimeout(r, 100));
+  }
+  return true;
+}
+
+async function initAuth() {
+  if (!isGoogleConfigured()) return { ok: false, reason: 'not-configured' };
+  const ready = await waitForGsi();
+  if (!ready) return { ok: false, reason: 'library-not-loaded' };
 
   try {
-    msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
-    // Handle the redirect response (if returning from Microsoft login)
-    const response = await msalInstance.handleRedirectPromise();
-    if (response && response.account) {
-      msalInstance.setActiveAccount(response.account);
-      currentAccount = response.account;
-      return { ok: true, signedIn: true };
-    }
-    // Otherwise, check for an existing cached account
-    const accounts = msalInstance.getAllAccounts();
-    if (accounts.length > 0) {
-      currentAccount = accounts[0];
-      msalInstance.setActiveAccount(currentAccount);
-      return { ok: true, signedIn: true };
-    }
-    return { ok: true, signedIn: false };
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: GOOGLE_SCOPES,
+      callback: () => {}, // overridden per request
+    });
   } catch (err) {
-    console.error('MSAL init failed', err);
     return { ok: false, reason: 'init-error', error: err };
   }
-}
 
-async function signIn() {
-  // Clear any prior error
-  const errEl = document.getElementById('signin-error');
-  if (errEl) errEl.classList.add('hidden');
+  // Restore cached token if still valid
+  const cached = await sget('app:googleToken', true, null);
+  if (cached && cached.expires_at > Date.now() + 60000) {
+    currentToken = cached.access_token;
+    currentTokenExpiresAt = cached.expires_at;
+    currentAccount = cached.account || null;
+    driveFileId = cached.fileId || null;
+    return { ok: true, signedIn: true };
+  }
 
-  if (!isMsalConfigured()) {
-    document.getElementById('signin-config-warning')?.classList.remove('hidden');
-    return;
-  }
-  if (!msalInstance) {
-    showSigninError('Sign-in library failed to load. Refresh and try again.');
-    return;
-  }
-  try {
-    await msalInstance.loginRedirect({
-      scopes: GRAPH_SCOPES,
-      prompt: 'select_account',
-    });
-    // Browser redirects to Microsoft; rest of code doesn't run.
-  } catch (err) {
-    showSigninError(err.message || 'Sign-in failed');
-  }
-}
-
-async function microsoftSignOut() {
-  if (!msalInstance || !currentAccount) return;
-  try {
-    await msalInstance.logoutRedirect({
-      account: currentAccount,
-      postLogoutRedirectUri: window.location.origin + window.location.pathname,
-    });
-  } catch (e) {
-    console.error('Sign-out failed', e);
-  }
+  return { ok: true, signedIn: false };
 }
 
 function showSigninError(msg) {
@@ -1379,48 +1348,91 @@ function showSigninError(msg) {
   errEl.classList.remove('hidden');
 }
 
-async function skipSignIn() {
-  localOnly = true;
-  await sset('app:localOnly', true, true);
-  await loadState();
-  if (state.members.length === 0) {
-    showScreen('setup');
-  } else if (!state.currentMember) {
-    showScreen('login');
-    renderLoginPicker();
-  } else {
-    goto('dashboard');
-  }
-}
+async function signIn() {
+  const errEl = document.getElementById('signin-error');
+  if (errEl) errEl.classList.add('hidden');
 
-async function connectMicrosoft() {
-  // Called from More tab when in local-only mode
-  if (!isMsalConfigured()) {
-    toast('Azure setup needed first — see README');
+  if (!isGoogleConfigured()) {
+    document.getElementById('signin-config-warning')?.classList.remove('hidden');
     return;
   }
-  localOnly = false;
-  await sset('app:localOnly', false, true);
-  await signIn(); // redirects to Microsoft
+  if (!tokenClient) {
+    showSigninError('Sign-in library not loaded yet. Refresh the page and try again.');
+    return;
+  }
+
+  return new Promise((resolve) => {
+    tokenClient.callback = async (response) => {
+      if (response.error) {
+        showSigninError(response.error_description || response.error || 'Sign-in failed');
+        resolve(false);
+        return;
+      }
+      currentToken = response.access_token;
+      // Google access tokens default to 3600s
+      currentTokenExpiresAt = Date.now() + ((response.expires_in || 3600) * 1000);
+
+      // Fetch the user's basic profile
+      try {
+        const userInfo = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: { Authorization: `Bearer ${currentToken}` },
+        }).then(r => r.json());
+        currentAccount = { email: userInfo.email || 'Google account', name: userInfo.name || '' };
+      } catch (e) {
+        currentAccount = { email: 'Google account', name: '' };
+      }
+
+      await sset('app:googleToken', {
+        access_token: currentToken,
+        expires_at: currentTokenExpiresAt,
+        account: currentAccount,
+        fileId: driveFileId,
+      }, true);
+
+      // Reload to re-enter app cleanly with the new sign-in
+      window.location.reload();
+      resolve(true);
+    };
+
+    tokenClient.requestAccessToken({ prompt: 'consent' });
+  });
+}
+
+async function googleSignOut() {
+  if (currentToken) {
+    try { google.accounts.oauth2.revoke(currentToken, () => {}); } catch (e) {}
+  }
+  currentToken = null;
+  currentAccount = null;
+  driveFileId = null;
+  await sdel('app:googleToken', true);
 }
 
 async function getAccessToken() {
-  if (!msalInstance) throw new Error('Not initialized');
-  if (!currentAccount) throw new Error('Not signed in');
-  try {
-    const result = await msalInstance.acquireTokenSilent({
-      scopes: GRAPH_SCOPES,
-      account: currentAccount,
+  if (!currentToken) throw new Error('Not signed in');
+  if (Date.now() > currentTokenExpiresAt - 60000) {
+    // Token expired or near-expiry — try silent re-acquisition
+    if (!tokenClient) throw new Error('Sign-in required');
+    return new Promise((resolve, reject) => {
+      tokenClient.callback = (response) => {
+        if (response.error) {
+          reject(new Error('Sign-in required — please tap Sign in again'));
+          return;
+        }
+        currentToken = response.access_token;
+        currentTokenExpiresAt = Date.now() + ((response.expires_in || 3600) * 1000);
+        sset('app:googleToken', {
+          access_token: currentToken,
+          expires_at: currentTokenExpiresAt,
+          account: currentAccount,
+          fileId: driveFileId,
+        }, true).then(() => resolve(currentToken));
+      };
+      // Try without prompt first
+      tokenClient.requestAccessToken({ prompt: '' });
     });
-    return result.accessToken;
-  } catch (e) {
-    if (e && (e.name === 'InteractionRequiredAuthError' || /interaction_required|consent_required|login_required/i.test(e.errorCode || e.message || ''))) {
-      // Need interactive — redirect (this will reload the page)
-      await msalInstance.acquireTokenRedirect({ scopes: GRAPH_SCOPES });
-      throw new Error('Re-authenticating');
-    }
-    throw e;
   }
+  return currentToken;
 }
 
 /* ---------- Helpers ---------- */
@@ -1452,7 +1464,7 @@ function setSyncStatus(status, errMsg) {
 function markDirty() {
   if (sync.suppressDirty) return;
   if (!sync.enabled || !state.currentMember) return;
-  if (!currentAccount) return; // No point queuing if never signed in
+  if (!currentToken) return;
   if (sync.debounceTimer) clearTimeout(sync.debounceTimer);
   setSyncStatus('pending');
   sync.debounceTimer = setTimeout(() => { performSync().catch(()=>{}); }, CLOUD.debounceMs);
@@ -1474,12 +1486,109 @@ function buildSnapshot() {
   };
 }
 
-/* ---------- Push / Pull via Graph API ---------- */
+/* ---------- Google Drive operations ---------- */
+
+async function findDriveFile() {
+  if (driveFileId) return driveFileId;
+  const token = await getAccessToken();
+  const q = `name='${CLOUD.filename}' and trashed=false`;
+  const url = `${CLOUD.driveBase}/files?q=${encodeURIComponent(q)}&fields=files(id,name,modifiedTime)&pageSize=10`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Search failed: ${res.status} ${truncate(txt, 100)}`);
+  }
+  const data = await res.json();
+  if (data.files && data.files.length > 0) {
+    driveFileId = data.files[0].id;
+    // Update cached token entry
+    const cached = await sget('app:googleToken', true, null);
+    if (cached) {
+      cached.fileId = driveFileId;
+      await sset('app:googleToken', cached, true);
+    }
+    return driveFileId;
+  }
+  return null;
+}
+
+async function readDriveFile() {
+  const fileId = await findDriveFile();
+  if (!fileId) return null;
+  const token = await getAccessToken();
+  const res = await fetch(`${CLOUD.driveBase}/files/${fileId}?alt=media`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 404) {
+    driveFileId = null;
+    return null;
+  }
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Read failed: ${res.status} ${truncate(txt, 100)}`);
+  }
+  return await res.text();
+}
+
+async function writeDriveFile(content) {
+  const token = await getAccessToken();
+  let fileId = await findDriveFile();
+
+  if (fileId) {
+    // Update existing file
+    const res = await fetch(`${CLOUD.uploadBase}/files/${fileId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: content,
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`Update failed: ${res.status} ${truncate(txt, 100)}`);
+    }
+    return fileId;
+  }
+
+  // Create new file (multipart upload: metadata + content)
+  const metadata = { name: CLOUD.filename, mimeType: 'application/json' };
+  const boundary = 'vidhuvaru-boundary-' + Math.random().toString(36).slice(2);
+  const delimiter = `\r\n--${boundary}\r\n`;
+  const closeDelim = `\r\n--${boundary}--`;
+  const body =
+    delimiter +
+    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+    JSON.stringify(metadata) +
+    delimiter +
+    'Content-Type: application/json\r\n\r\n' +
+    content +
+    closeDelim;
+
+  const res = await fetch(`${CLOUD.uploadBase}/files?uploadType=multipart&fields=id`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': `multipart/related; boundary=${boundary}`,
+    },
+    body: body,
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Create failed: ${res.status} ${truncate(txt, 100)}`);
+  }
+  const data = await res.json();
+  driveFileId = data.id;
+  return data.id;
+}
+
+/* ---------- Push / Pull ---------- */
 
 async function performSync() {
   if (sync.inflight) return;
-  if (!sync.enabled) return;
-  if (!state.currentMember || !currentAccount) return;
+  if (!sync.enabled || !state.currentMember || !currentToken) return;
   sync.inflight = true;
   if (sync.retryTimer) { clearTimeout(sync.retryTimer); sync.retryTimer = null; }
   setSyncStatus('syncing');
@@ -1487,21 +1596,7 @@ async function performSync() {
   try {
     const snapshot = buildSnapshot();
     const json = JSON.stringify(snapshot);
-    const token = await getAccessToken();
-    // PUT to a nested path auto-creates folders (no need to create folder separately)
-    const url = `${CLOUD.graphBase}/me/drive/root:/${CLOUD.filePath}:/content`;
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: json,
-    });
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`HTTP ${res.status}: ${truncate(txt, 160)}`);
-    }
+    await writeDriveFile(json);
     sync.lastSyncAt = new Date();
     sync.lastError = null;
     sync.inflight = false;
@@ -1517,33 +1612,21 @@ async function performSync() {
 
 async function performPull() {
   if (sync.inflight) return null;
-  if (!currentAccount) return null;
+  if (!currentToken) return null;
   sync.inflight = true;
   setSyncStatus('syncing');
 
   try {
-    const token = await getAccessToken();
-    const url = `${CLOUD.graphBase}/me/drive/root:/${CLOUD.filePath}:/content`;
-    const res = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (res.status === 404) {
+    const text = await readDriveFile();
+    if (!text) {
       sync.inflight = false;
       sync.lastSyncAt = new Date();
       setSyncStatus('synced');
       return { found: false };
     }
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`HTTP ${res.status}: ${truncate(txt, 160)}`);
-    }
-    const text = await res.text();
     let snapshot;
-    try {
-      snapshot = JSON.parse(text);
-    } catch (e) {
-      throw new Error('Could not parse cloud file (corrupted?)');
-    }
+    try { snapshot = JSON.parse(text); }
+    catch (e) { throw new Error('Could not parse cloud file (corrupted?)'); }
     sync.lastSyncAt = new Date();
     sync.lastError = null;
     sync.inflight = false;
@@ -1595,12 +1678,37 @@ async function pullAndMaybeApply() {
   return { applied: false, result };
 }
 
+/* ---------- More-tab cloud card ---------- */
+
+async function skipSignIn() {
+  localOnly = true;
+  await sset('app:localOnly', true, true);
+  await loadState();
+  if (state.members.length === 0) {
+    showScreen('setup');
+  } else if (!state.currentMember) {
+    showScreen('login');
+    renderLoginPicker();
+  } else {
+    goto('dashboard');
+  }
+}
+
+async function connectGoogle() {
+  if (!isGoogleConfigured()) {
+    toast('Google Cloud setup needed first — see README');
+    return;
+  }
+  localOnly = false;
+  await sset('app:localOnly', false, true);
+  await signIn();
+}
+
 function renderCloudCard() {
   const el = document.getElementById('cloud-card');
   if (!el) return;
 
-  // Local-only mode — show a friendly connect prompt
-  if (localOnly && !currentAccount) {
+  if (localOnly && !currentToken) {
     el.innerHTML = `
       <div class="head">
         <div class="ic" style="background: var(--warn-soft); color: var(--warn);">☁</div>
@@ -1611,29 +1719,29 @@ function renderCloudCard() {
         <span class="cloud-status-pill muted"><span class="dot"></span>Local only</span>
       </div>
       <p style="font-size:12px; color:var(--ink-2); margin:0 0 12px; line-height:1.5;">
-        Connect Microsoft to sync your data to OneDrive — so other family members can use the app too.
+        Connect Google to sync your data to Google Drive — so other family members can use the app too.
       </p>
-      <button class="btn-microsoft btn-block" onclick="connectMicrosoft()" style="padding: 11px 14px; font-size: 13px;">
-        <svg viewBox="0 0 21 21" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
-          <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
-          <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
-          <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
-          <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+      <button class="btn-google btn-block" onclick="connectGoogle()" style="padding: 11px 14px; font-size: 13px;">
+        <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg">
+          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
         </svg>
-        <span>Connect Microsoft</span>
+        <span>Connect Google</span>
       </button>
     `;
     return;
   }
 
-  const accLabel = currentAccount ? (currentAccount.username || currentAccount.name || 'Microsoft account') : 'Not signed in';
+  const accLabel = currentAccount ? (currentAccount.email || 'Google account') : 'Not signed in';
   const cfg = {
     synced:  { cls: '',     txt: 'Connected',  show: 'Last synced ' + timeAgo(sync.lastSyncAt) },
     pending: { cls: 'warn', txt: 'Pending',    show: 'Saving in a moment…' },
-    syncing: { cls: 'warn', txt: 'Syncing',    show: 'Saving to OneDrive…' },
+    syncing: { cls: 'warn', txt: 'Syncing',    show: 'Saving to Google Drive…' },
     error:   { cls: 'err',  txt: 'Sync error', show: sync.lastError ? truncate(sync.lastError, 80) : 'Will retry shortly' },
     offline: { cls: 'muted',txt: 'Local only', show: 'Data only on this phone' },
-    idle:    { cls: 'muted',txt: currentAccount ? 'Idle' : 'Offline', show: sync.lastSyncAt ? 'Last synced ' + timeAgo(sync.lastSyncAt) : (currentAccount ? 'Waiting for changes' : 'Sign in to enable cloud sync') }
+    idle:    { cls: 'muted',txt: currentToken ? 'Idle' : 'Offline', show: sync.lastSyncAt ? 'Last synced ' + timeAgo(sync.lastSyncAt) : (currentToken ? 'Waiting for changes' : 'Sign in to enable cloud sync') }
   };
   const p = cfg[sync.status] || cfg.idle;
   el.innerHTML = `
@@ -1646,31 +1754,31 @@ function renderCloudCard() {
       <span class="cloud-status-pill ${p.cls}"><span class="dot"></span>${p.txt}</span>
     </div>
     <div class="actions">
-      <button class="btn btn-soft" onclick="manualSync()" ${!currentAccount ? 'disabled' : ''}>Sync now</button>
-      <button class="btn btn-soft" onclick="manualPull()" ${!currentAccount ? 'disabled' : ''}>Pull from cloud</button>
+      <button class="btn btn-soft" onclick="manualSync()" ${!currentToken ? 'disabled' : ''}>Sync now</button>
+      <button class="btn btn-soft" onclick="manualPull()" ${!currentToken ? 'disabled' : ''}>Pull from cloud</button>
     </div>
     <div style="margin-top:10px; font-size:11px; color:var(--muted);">
-      File: <strong>OneDrive › ${escapeHtml(CLOUD.folder)} › ${escapeHtml(CLOUD.filename)}</strong>
+      File: <strong>Google Drive › ${escapeHtml(CLOUD.filename)}</strong>
     </div>
   `;
 }
 
 async function manualSync() {
-  if (!currentAccount) { toast('Sign in first'); return; }
+  if (!currentToken) { toast('Sign in first'); return; }
   if (sync.debounceTimer) { clearTimeout(sync.debounceTimer); sync.debounceTimer = null; }
   await performSync();
-  if (sync.status === 'synced') toast('Saved to OneDrive');
+  if (sync.status === 'synced') toast('Saved to Google Drive');
   else if (sync.lastError) toast('Sync failed: ' + truncate(sync.lastError, 50));
 }
 
 async function manualPull() {
-  if (!currentAccount) { toast('Sign in first'); return; }
-  if (!confirm('Replace your current data with the latest from OneDrive?\n\nYour unsynced local changes will be overwritten.')) return;
+  if (!currentToken) { toast('Sign in first'); return; }
+  if (!confirm('Replace your current data with the latest from Google Drive?\n\nYour unsynced local changes will be overwritten.')) return;
   const result = await performPull();
   if (result && result.found && result.snapshot) {
     await applySnapshot(result.snapshot);
     if (state.view) goto(state.view);
-    toast('Pulled latest from OneDrive');
+    toast('Pulled latest from Google Drive');
   } else if (result && !result.found && !result.error) {
     toast('No cloud file yet');
   } else if (result?.error) {
@@ -1846,12 +1954,11 @@ async function logout() {
 }
 
 async function fullSignOut() {
-  if (!confirm('Sign out of Microsoft on this device?\n\nYou\'ll need to sign in again to sync with OneDrive.')) return;
-  // Clear PIN session first
+  if (!confirm('Sign out of Google on this device?\n\nYou\'ll need to sign in again to sync with Google Drive.')) return;
   state.currentMember = null;
   await sdel(KEY.currentUser, false);
-  // Then redirect to Microsoft sign-out (page will reload)
-  await microsoftSignOut();
+  await googleSignOut();
+  window.location.reload();
 }
 
 async function changePin() {
@@ -2665,38 +2772,31 @@ async function init() {
   // Remember if user previously chose local-only
   localOnly = await sget('app:localOnly', true, false);
 
-  // 1. Initialize Microsoft auth (skipped if local-only chosen)
-  const msalResult = localOnly
+  // 1. Initialize Google auth (skipped if local-only chosen)
+  const authResult = localOnly
     ? { ok: true, signedIn: false }
-    : await initMsal();
+    : await initAuth();
 
   // 2. Load whatever's in localStorage (instant UI for offline / returning users)
   await loadState();
 
-  // 3. If not local-only AND (MSAL not configured or not signed in) → show sign-in screen
-  if (!localOnly && (!msalResult.ok || !msalResult.signedIn)) {
-    if (msalResult.reason === 'not-configured') {
+  // 3. If not local-only AND (auth not configured or not signed in) → show sign-in screen
+  if (!localOnly && (!authResult.ok || !authResult.signedIn)) {
+    if (authResult.reason === 'not-configured') {
       document.getElementById('signin-config-warning')?.classList.remove('hidden');
-    } else if (msalResult.reason === 'init-error' && msalResult.error) {
-      const errMsg = msalResult.error.errorMessage || msalResult.error.message || String(msalResult.error);
-      let hint = errMsg;
-      if (/AADSTS50011/i.test(errMsg) || /redirect.?uri/i.test(errMsg)) {
-        hint = `Redirect URI mismatch. In Azure → your app → Authentication, add this exact URL as a Single-page application redirect URI:\n${window.location.origin + window.location.pathname}`;
-      } else if (/AADSTS9002326|AADSTS90072/i.test(errMsg)) {
-        hint = 'Account type mismatch. In Azure → your app → Authentication, change "Supported account types" to include personal Microsoft accounts.';
-      }
-      showSigninError(hint);
+    } else if (authResult.reason === 'init-error' && authResult.error) {
+      const errMsg = authResult.error.message || String(authResult.error);
+      showSigninError(errMsg);
     }
-    // Warn if running from file:// — OAuth requires http/https
     if (window.location.protocol === 'file:') {
-      showSigninError("This app must be deployed (e.g. to Vercel) — Microsoft sign-in won't work when opening the file directly. For now, tap 'Use without cloud sync' to try the app.");
+      showSigninError("This app must be deployed (e.g. to Vercel) — Google sign-in won't work when opening the file directly. For now, tap 'Use without cloud sync' to try the app.");
     }
     showScreen('signin');
     return;
   }
 
   // 4. Signed in (or local-only) — if no local members, try to pull from cloud
-  if (state.members.length === 0 && currentAccount) {
+  if (state.members.length === 0 && currentToken) {
     const pullResult = await performPull();
     if (pullResult && pullResult.found && pullResult.snapshot) {
       await applySnapshot(pullResult.snapshot);
@@ -2712,7 +2812,7 @@ async function init() {
   } else {
     goto('dashboard');
     setSyncStatus(localOnly ? 'offline' : 'idle');
-    if (currentAccount) {
+    if (currentToken) {
       pullAndMaybeApply().catch(()=>{});
     }
   }
