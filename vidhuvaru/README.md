@@ -1,142 +1,166 @@
+[README.md](https://github.com/user-attachments/files/27584016/README.md)
 # Vidhuvaru — Family Finance Setup
 
-A mobile-first family finance tracker. Data syncs across all family devices via your personal OneDrive.
+A mobile-first family finance tracker. Data syncs across all family devices via your personal Google Drive.
 
-This guide gets you from these files → a real URL like `https://vidhuvaru-fathik.vercel.app` that you can share with your family. **Total time: ~10 minutes.** No coding required.
+This guide takes ~10 minutes. No coding required.
 
 ---
 
 ## What you need
 
-- A computer (just for setup — afterwards everyone uses phones)
-- Your Microsoft account (the OneDrive that will hold the data, e.g. `fathik@outlook.com`)
-- A free [Vercel](https://vercel.com) account (you can sign up with GitHub or email)
-- A free [Azure](https://portal.azure.com) account (comes with your Microsoft account — nothing to pay)
+- A computer for the setup (afterwards everyone uses phones)
+- A Google account (e.g. a Gmail)
+- A free [Google Cloud Console](https://console.cloud.google.com) project (no payment needed)
+- The app already deployed at `vidhuvaru.vercel.app` ✅
 
-> **Don't want to set up Azure right now?** You don't have to. After deploying to Vercel, open the URL on your phone and tap **"Use without cloud sync"** — the app works fully on that one phone. You can connect Microsoft later from **More → Cloud sync**. Skip to Step 1 below; ignore steps 2-3.
-
----
-
-## Step 1 — Deploy to Vercel (2 min)
-
-You need the URL first, because Azure asks for it in Step 2.
-
-1. Go to **https://vercel.com/new**
-2. Click **"Continue with email"** (or GitHub) and create the account
-3. Drag the **whole `vidhuvaru` folder** onto the upload area (Vercel calls this "Deploy folder")
-4. Project name: `vidhuvaru` (or whatever you want — this becomes part of the URL)
-5. Click **Deploy**
-6. After ~30 seconds you'll get a URL like `https://vidhuvaru-fathik-xxxx.vercel.app`
-7. **Copy that URL** — you'll paste it in the next step
-
-> Don't try to open the URL yet — it'll fail until you finish Step 3.
+> **Don't want to set up Google Cloud right now?** Skip everything below. Open `vidhuvaru.vercel.app` on your phone and tap **"Use without cloud sync"** — the app works fully on that one phone. Connect Google later from inside the app.
 
 ---
 
-## Step 2 — Register the app in Azure (3 min)
+## Step 1 — Create a Google Cloud project (1 min)
 
-This gives the app permission to read/write your OneDrive.
-
-1. Go to **https://portal.azure.com** and sign in with `fathik@outlook.com`
-2. In the search bar at top, type **"App registrations"** and click it
-3. Click **"+ New registration"**
-4. Fill in:
-   - **Name**: `Vidhuvaru Family Finance`
-   - **Supported account types**: select **"Personal Microsoft accounts only"**
-   - **Redirect URI**:
-     - Platform: **Single-page application (SPA)**
-     - URL: paste the Vercel URL you copied (e.g. `https://vidhuvaru-fathik-xxxx.vercel.app`)
-5. Click **Register**
-6. On the page that loads, copy the **"Application (client) ID"** (long string with dashes — looks like `a1b2c3d4-...-...-...-xxxxxxxxxxxx`)
-
-> Tip: also add `http://localhost:8080` as another redirect URI under **Authentication → Add a platform → Single-page application** if you ever want to test the app locally.
+1. Go to **https://console.cloud.google.com**
+2. Sign in with your Google account
+3. At the very top, click the **project dropdown** (next to "Google Cloud" logo)
+4. Click **"NEW PROJECT"** (top right of the popup)
+5. Project name: `Vidhuvaru` → click **Create**
+6. Wait ~10 seconds, then click the project dropdown again and **select Vidhuvaru**
 
 ---
 
-## Step 3 — Paste the Client ID into the app (1 min)
+## Step 2 — Enable Google Drive API (1 min)
 
-1. Open `index.html` in any text editor (Notepad, TextEdit, VS Code — anything)
-2. Press Ctrl+F (or Cmd+F) and search for: **`YOUR_AZURE_CLIENT_ID_HERE`**
-3. Replace it with the Application (client) ID you copied
-   - Keep the quotes around it: `const AZURE_CLIENT_ID = 'a1b2c3d4-...';`
-4. Save the file
+1. In the search bar at the top of the Google Cloud console, type **"Google Drive API"** → click the result
+2. Click the blue **"Enable"** button
+3. Wait ~5 seconds. Done.
 
 ---
 
-## Step 4 — Redeploy (1 min)
+## Step 3 — Set up the OAuth consent screen (3 min)
 
-You changed the file, so push the update:
+This is the longest step. Just fill in what's asked.
 
-1. Go back to **https://vercel.com** → your project
-2. Click **"Deployments"** in the top nav
-3. Click **"..." (three dots)** next to the most recent deployment → **"Redeploy"**
-4. OR: re-drag the `vidhuvaru` folder onto the dashboard
+1. In the left sidebar (or search bar) go to **"OAuth consent screen"**
+2. Click **"Get Started"** (or "+ Create" if shown)
+3. **App information:**
+   - App name: `Vidhuvaru`
+   - User support email: your Gmail
+   - Click **Next**
+4. **Audience:** Choose **"External"** → click Next
+5. **Contact information:** your Gmail → Next
+6. **Finish:** agree to the policy → Create
 
-Wait ~30 seconds. Done.
+You'll land on the OAuth Overview page.
 
----
+### Now add your family as test users
 
-## Step 5 — Test it on your phone (1 min)
-
-1. On your phone, open the Vercel URL in **Safari (iPhone)** or **Chrome (Android)**
-2. Tap **"Sign in with Microsoft"**
-3. Sign in with `fathik@outlook.com`
-4. After redirect, you should see the **family setup screen** — add your 6 family members
-
-**Add to home screen:**
-- **iPhone (Safari)**: Tap the Share button (square with arrow up) → **"Add to Home Screen"**
-- **Android (Chrome)**: Tap the **⋮ menu** → **"Add to Home screen"** or **"Install app"**
-
-The app icon will appear on the home screen and launches like a real native app.
+1. In the left sidebar click **"Audience"** (under "OAuth consent screen")
+2. Scroll down to **"Test users"** → click **"+ Add users"**
+3. Add the Gmail address of every family member who will use the app (up to 100)
+   - If you'll all share one account (simplest), just add that one
+4. Click **Save**
 
 ---
 
-## Step 6 — Share with family
+## Step 4 — Create the OAuth Client ID (1 min)
+
+1. In the left sidebar click **"Clients"** (or **"Credentials" → "OAuth 2.0 Client IDs"**)
+2. Click **"+ Create Client"** at the top
+3. **Application type:** select **"Web application"**
+4. **Name:** `Vidhuvaru Web`
+5. **Authorized JavaScript origins:** click **+ Add URI** and paste:
+   ```
+   https://vidhuvaru.vercel.app
+   ```
+   (No trailing slash)
+6. **Authorized redirect URIs:** click **+ Add URI** and paste the same:
+   ```
+   https://vidhuvaru.vercel.app
+   ```
+7. Click **Create**
+8. A popup shows your **Client ID** — copy it. It looks like:
+   ```
+   123456789012-abcdefghijklmnop.apps.googleusercontent.com
+   ```
+
+---
+
+## Step 5 — Paste Client ID into the app (1 min)
+
+1. Open your GitHub repo's index.html for editing:
+   **https://github.com/faathik-hue/Vidhuvaru/blob/main/vidhuvaru/index.html**
+2. Click the **pencil icon (✏️)** at the top right of the file
+3. Press **Cmd+F** (Mac) or Ctrl+F and search for: `YOUR_GOOGLE_CLIENT_ID_HERE`
+4. Replace it with the Client ID you copied (keep the quotes!):
+   ```js
+   const GOOGLE_CLIENT_ID = '123456789012-abc...apps.googleusercontent.com';
+   ```
+5. Scroll to bottom → green **"Commit changes"** button → confirm
+
+---
+
+## Step 6 — Test it (1 min)
+
+Vercel auto-redeploys when GitHub changes. Wait ~30 seconds.
+
+1. Open **vidhuvaru.vercel.app** on your phone (or refresh if already open)
+2. Tap **"Sign in with Google"**
+3. Sign in with a Gmail you added as a test user
+4. You'll see Google's warning **"Google hasn't verified this app"** → tap **"Advanced"** → **"Go to Vidhuvaru (unsafe)"** — this only shows for test apps; it's fine because you're a test user
+5. Tap **"Allow"** to grant access to create files in your Drive
+6. You're in! Set up your family members.
+
+---
+
+## Step 7 — Share with family
 
 Each family member, on their phone:
+1. Open `vidhuvaru.vercel.app`
+2. Tap **"Sign in with Google"** — sign in with the **same Gmail** (or their own if you added them as test users in Step 3)
+3. They land on the family picker → tap their name → enter their PIN
+4. They see all family data, synced through Google Drive
 
-1. Open the Vercel URL (you can text it to them or show them once)
-2. Sign in with the **same Microsoft account** (`fathik@outlook.com`)
-3. Add to home screen (as above)
-4. On the family picker, they tap their own name and enter their 4-digit PIN
-
-They'll see all the family data because everyone is reading from the same OneDrive file.
-
-> The single Microsoft account is shared because it owns the OneDrive file. If you don't want family to know the Microsoft password, sign each phone in yourself once and they'll stay signed in.
+**Add to home screen:**
+- iPhone Safari: Share button → **Add to Home Screen**
+- Android Chrome: ⋮ menu → **Install app**
 
 ---
 
 ## How it works
 
-- Your data lives in **OneDrive › Apps/Vidhuvaru › vidhuvaru-data.json**
-- After every change, the app waits 3 seconds then quietly pushes a snapshot to OneDrive
-- When someone opens the app, it pulls the latest from OneDrive in the background
-- **Last save wins** — if two people edit at the exact same second, one overwrites the other (rare in practice)
-- You can open `vidhuvaru-data.json` directly in OneDrive web or any text editor — it's plain JSON
+- Your data is one JSON file in Google Drive: `vidhuvaru-data.json`
+- After every change, the app pushes a snapshot to Drive (3-second debounce)
+- When someone opens the app, it pulls the latest from Drive
+- **Last save wins** — if two people save simultaneously, one overwrites the other (rare in practice)
+- You can open `vidhuvaru-data.json` directly at https://drive.google.com — it's plain JSON
 
 ---
 
 ## Troubleshooting
 
-**"AADSTS50011: The redirect URI specified in the request does not match..."**
-The Vercel URL in Azure → App Registration → Authentication doesn't match exactly. Copy your Vercel URL again, exactly as it appears (no trailing slash, including `https://`), and add it to Azure.
+**"Error 400: redirect_uri_mismatch"**
+Your app's URL doesn't match what's in Google Cloud. Open Google Cloud Console → APIs & Services → Credentials → your OAuth Client → make sure both "Authorized JavaScript origins" and "Authorized redirect URIs" include `https://vidhuvaru.vercel.app` exactly.
 
-**Sign in works but says "Sync error"**
-You may have forgotten to grant `Files.ReadWrite` permission, or your Azure app's account type is wrong. Go to Azure → your app → Authentication → make sure "Personal Microsoft accounts only" or "Personal + work/school" is selected.
+**"Access blocked: Vidhuvaru has not completed the Google verification process"**
+The Gmail trying to sign in wasn't added as a test user. Go to Google Cloud Console → OAuth consent screen → Audience → Test users → add that Gmail.
 
-**Avatar dot is red after editing**
-Open the **More** tab → look at the **Cloud sync** card for the error message. Usually it's a transient network hiccup — tap **Sync now** to retry.
+**Avatar dot stays red after editing**
+Open **More** tab → look at the **Cloud sync** card for the error message. Tap **Sync now** to retry.
 
-**Want to reset everything**
-- Head goes to **More → Reset everything** (this clears the device's local copy)
-- Also delete `vidhuvaru-data.json` from OneDrive web at `Apps/Vidhuvaru/`
+**Token expired / "Sign in required"**
+Google access tokens last 1 hour. Just tap Sign in with Google again. The app tries to refresh silently first.
+
+**Want to start fresh**
+- In the app: **More → Reset everything** (only Head can do this)
+- Also delete `vidhuvaru-data.json` from Google Drive web
 
 ---
 
 ## Files in this folder
 
-- `index.html` — the whole app (open in any browser)
-- `manifest.webmanifest` — tells phones it's a PWA (Add to Home Screen)
+- `index.html` — the whole app
+- `manifest.webmanifest` — PWA manifest (Add to Home Screen)
 - `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` — app icons
 - `README.md` — this file
 
