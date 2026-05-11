@@ -363,8 +363,8 @@
   .pick-sub{font-size:11px;color:var(--muted);margin-top:1px}
   .pick-chev{color:var(--muted);font-size:18px;font-weight:300}
   /* Logged-in card on dashboard */
-  .login-card{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--navy2) 0%,rgba(212,167,74,.06) 100%);border:1px solid rgba(212,167,74,.18);border-radius:var(--radius);padding:14px;margin-bottom:12px;position:relative;overflow:hidden}
-  .login-card::before{content:"";position:absolute;top:-30px;right:-20px;width:120px;height:120px;background:radial-gradient(circle,rgba(212,167,74,.12),transparent 65%);pointer-events:none}
+  .whoami-card{display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,var(--navy2) 0%,rgba(212,167,74,.06) 100%);border:1px solid rgba(212,167,74,.18);border-radius:var(--radius);padding:14px;margin-bottom:12px;position:relative;overflow:hidden}
+  .whoami-card::before{content:"";position:absolute;top:-30px;right:-20px;width:120px;height:120px;background:radial-gradient(circle,rgba(212,167,74,.12),transparent 65%);pointer-events:none}
   .lc-av{width:48px;height:48px;border-radius:50%;background:rgba(212,167,74,.18);border:1.5px solid rgba(212,167,74,.4);color:var(--gold);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:24px;flex-shrink:0;position:relative}
   .lc-info{flex:1;min-width:0;position:relative}
   .lc-nm{font-size:16px;font-weight:700;color:var(--cream);display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
@@ -1120,7 +1120,7 @@ function renderLoggedInCard(){
   const email=session.googleEmail||lsGet('googleEmail')||'';
   const others=state.members.filter(x=>x.id!==m.id);
   return `
-    <div class="login-card">
+    <div class="whoami-card">
       <div class="lc-av">${memInitial(m.name)}</div>
       <div class="lc-info">
         <div class="lc-nm">${escapeHTML(m.name)} <span class="lc-rl">${escapeHTML(m.role)}</span></div>
