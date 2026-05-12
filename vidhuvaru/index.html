@@ -1498,6 +1498,70 @@ function memberHousePaid(memberId, mk){
   return monthExpenses(mk,'household').filter(e=>e.type==='expense' && e.paidBy===memberId)
     .reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
 }
+// Range-aware version: uses the current statsRange ('day'/'week'/'month'/'year')
+function memberHouseShareRange(memberId){
+  if(typeof statsRange==='undefined')return 0;
+  const exps=expensesInRange('household');
+  let share=0;
+  for(const e of exps){
+    if(e.type!=='expense')continue;
+    if(e.contributions && Object.keys(e.contributions).length>0){
+      share += toMVR(+(e.contributions[memberId]||0), e.currency||'MVR');
+    } else if(e.paidBy===memberId){
+      share += toMVR(e.amount,e.currency||'MVR');
+    }
+  }
+  return share;
+}
+// Build a small daily/weekly bar visualization for the Stats summary
+function buildMicroBars(exps){
+  if(statsRange==='day' || !exps || exps.length===0)return '';
+  const today=new Date();
+  const buckets=[];
+  if(statsRange==='week'){
+    for(let i=6;i>=0;i--){
+      const d=new Date(today);d.setDate(today.getDate()-i);
+      const iso=d.toISOString().slice(0,10);
+      const tot=exps.filter(e=>e.date===iso).reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
+      buckets.push({label:d.toLocaleDateString('en',{weekday:'short'}).slice(0,1),total:tot,sub:d.getDate()});
+    }
+  }else if(statsRange==='month'){
+    // 4 weekly buckets within current month
+    const start=new Date(today.getFullYear(),today.getMonth(),1);
+    const end=new Date(today.getFullYear(),today.getMonth()+1,0);
+    const daysInMonth=end.getDate();
+    const bucketDays=Math.ceil(daysInMonth/4);
+    for(let i=0;i<4;i++){
+      const bStart=new Date(start);bStart.setDate(1+i*bucketDays);
+      const bEnd=new Date(start);bEnd.setDate(Math.min(daysInMonth,bStart.getDate()+bucketDays-1));
+      const sISO=bStart.toISOString().slice(0,10),eISO=bEnd.toISOString().slice(0,10);
+      const tot=exps.filter(e=>e.date>=sISO&&e.date<=eISO).reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
+      buckets.push({label:`W${i+1}`,total:tot,sub:`${bStart.getDate()}–${bEnd.getDate()}`});
+    }
+  }else if(statsRange==='year'){
+    // 12 month buckets of current year
+    for(let i=0;i<=today.getMonth();i++){
+      const k=`${today.getFullYear()}-${String(i+1).padStart(2,'0')}`;
+      const tot=monthExpenses(k,'household').reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
+      buckets.push({label:fmtMonthLab(k).slice(0,1),total:tot,sub:fmtMonthLab(k)});
+    }
+  }
+  if(buckets.length===0)return '';
+  const max=Math.max(...buckets.map(b=>b.total),1);
+  return `<div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.05)">
+    <div style="display:flex;align-items:flex-end;gap:6px;height:60px">
+      ${buckets.map(b=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">
+        <div title="${fmtMVR(b.total)}" style="width:100%;height:${Math.max(3,Math.round((b.total/max)*100))}%;background:linear-gradient(to top,color-mix(in oklab,var(--p-gold) 35%,transparent),var(--p-gold,var(--gold)));border-radius:4px 4px 0 0;box-shadow:0 0 6px color-mix(in oklab,var(--p-gold) 35%,transparent);min-height:3px"></div>
+      </div>`).join('')}
+    </div>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      ${buckets.map(b=>`<div style="flex:1;text-align:center">
+        <div style="font-size:9px;color:var(--fg-3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.08em;font-weight:700">${escapeHTML(b.label)}</div>
+        <div style="font-size:9px;color:var(--fg-3);font-family:var(--font-mono);margin-top:1px">${escapeHTML(String(b.sub))}</div>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
 // Inter-family lending: who owes whom (positive = they owe you)
 function familyLendingBalance(memberId){
   let net=0;
@@ -1597,14 +1661,14 @@ function renderDashboard(){
       <div class="more" onclick="go('more')">Manage</div>
     </div>
     <div class="houses">
-      <div class="house-card" style="--house-c:var(--house-hiya)">
+      <div class="house-card" style="--house-c:var(--house-hiya);cursor:pointer" onclick="openHouseDetail('hiya')">
         <div class="em">🏢</div>
         <div class="nm">Hiya Flat</div>
         <div class="sub">Malé</div>
         <div class="amt">MVR ${fmtNum(hiyaSpend)}</div>
         <div class="bar"><div class="fill" style="width:${Math.round((hiyaSpend/houseTot)*100)}%"></div></div>
       </div>
-      <div class="house-card" style="--house-c:var(--house-vidhuvaru)">
+      <div class="house-card" style="--house-c:var(--house-vidhuvaru);cursor:pointer" onclick="openHouseDetail('vidhuvaru')">
         <div class="em">🌴</div>
         <div class="nm">Vidhuvaru</div>
         <div class="sub">Island</div>
@@ -1741,8 +1805,36 @@ function renderTx(){
 function setTxFilter(k,v){txFilter[k]=v;if(k==='scope')txFilter.category=null;renderTx()}
 
 /* ============== STATS ============== */
+let statsRange='month'; // 'day' | 'week' | 'month' | 'year'
+function setStatsRange(r){statsRange=r;renderStats()}
+function expensesInRange(scope='household'){
+  const today=new Date();
+  let start=new Date(today);
+  if(statsRange==='day'){start.setHours(0,0,0,0)}
+  else if(statsRange==='week'){start.setDate(today.getDate()-6);start.setHours(0,0,0,0)}
+  else if(statsRange==='month'){start=new Date(today.getFullYear(),today.getMonth(),1)}
+  else if(statsRange==='year'){start=new Date(today.getFullYear(),0,1)}
+  const startISO=start.toISOString().slice(0,10);
+  const meId=session.currentMember?.id;
+  return state.expenses.filter(e=>{
+    if(!e.date||e.date<startISO)return false;
+    if(e.type!=='expense')return false;
+    if(scope==='household')return e.scope!=='personal';
+    if(scope==='personal')return e.scope==='personal' && e.paidBy===meId;
+    return true;
+  });
+}
+function rangeLabel(){
+  const t=new Date();
+  if(statsRange==='day')return 'Today';
+  if(statsRange==='week')return 'Last 7 days';
+  if(statsRange==='month')return t.toLocaleString('en',{month:'long'});
+  if(statsRange==='year')return String(t.getFullYear());
+  return '';
+}
 function renderStats(){
   const now=new Date();const year=now.getFullYear();const curMonth=now.getMonth();
+  // 12-month chart stays at month resolution regardless of range toggle (longer-term context)
   const monthly=[];
   for(let i=0;i<12;i++){
     const k=`${year}-${String(i+1).padStart(2,'0')}`;
@@ -1751,25 +1843,100 @@ function renderStats(){
   }
   const max=Math.max(...monthly.map(m=>m.total),1);
 
-  const mk=monthKey();
-  const exps=monthExpenses(mk,'household');
+  // Range-filtered data — household
+  const exps=expensesInRange('household');
   const byCat={};
   exps.forEach(e=>{const v=toMVR(e.amount,e.currency||'MVR');byCat[e.category]=(byCat[e.category]||0)+v});
   const sorted=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
-  const monthTotal=sorted.reduce((s,[,v])=>s+v,0);
+  const rangeTotal=sorted.reduce((s,[,v])=>s+v,0);
 
-  // Per-member: use SHARE (so contributions split is reflected fairly)
+  // Personal data for current member in same range
+  const myPersonalExps=expensesInRange('personal');
+  const myPersonalTotal=myPersonalExps.reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
+  const myByCat={};
+  myPersonalExps.forEach(e=>{const v=toMVR(e.amount,e.currency||'MVR');myByCat[e.category]=(myByCat[e.category]||0)+v});
+  const myCatSorted=Object.entries(myByCat).sort((a,b)=>b[1]-a[1]);
+
+  // Per-member: SHARE in range
+  const meId=session.currentMember?.id;
+  const myShare=memberHouseShareRange(meId);
   const byMem={};
-  state.members.forEach(m=>{byMem[m.id]=memberHouseShare(m.id,mk)});
+  state.members.forEach(m=>{byMem[m.id]=memberHouseShareRange(m.id)});
   const memSorted=Object.entries(byMem).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+
+  // Daily / weekly bars for short ranges
+  const microBars=buildMicroBars(exps);
 
   $('tabStats').innerHTML=`
     <div class="stats-h">
       <div class="title">Your <em>stats</em></div>
     </div>
 
+    <div style="display:flex;gap:6px;background:rgba(255,255,255,.04);border-radius:14px;padding:5px;margin-bottom:16px">
+      ${[['day','Today'],['week','Week'],['month','Month'],['year','Year']].map(([r,lab])=>`
+        <button onclick="setStatsRange('${r}')" style="flex:1;padding:9px 10px;border:none;border-radius:9px;font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;background:${statsRange===r?'color-mix(in oklab,var(--p-gold) 22%,transparent)':'transparent'};color:${statsRange===r?'var(--p-gold)':'var(--fg-2)'}">${lab}</button>
+      `).join('')}
+    </div>
+
     <div class="stats-card">
-      <div class="stats-card-hd"><h3>${year} · MONTHLY</h3></div>
+      <div class="stats-card-hd"><h3>${escapeHTML(rangeLabel())} · summary</h3></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="padding:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-2);font-weight:700">Household</div>
+          <div style="font-family:var(--font-serif);font-size:24px;font-weight:500;color:var(--p-gold,var(--gold));margin-top:6px;font-variant-numeric:tabular-nums">${fmtNum(rangeTotal)}</div>
+          <div style="font-size:10px;color:var(--fg-3);margin-top:2px;font-family:var(--font-mono)">${exps.length} expenses · my share ${fmtNum(myShare)}</div>
+        </div>
+        <div style="padding:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-2);font-weight:700">My personal</div>
+          <div style="font-family:var(--font-serif);font-size:24px;font-weight:500;color:var(--violet-400,#b39ddb);margin-top:6px;font-variant-numeric:tabular-nums">${fmtNum(myPersonalTotal)}</div>
+          <div style="font-size:10px;color:var(--fg-3);margin-top:2px;font-family:var(--font-mono)">${myPersonalExps.length} expenses</div>
+        </div>
+      </div>
+      ${microBars}
+    </div>
+
+    ${sorted.length>0?`<div class="stats-card">
+      <div class="stats-card-hd"><h3>Where it goes · ${escapeHTML(rangeLabel())}</h3></div>
+      <div style="background:rgba(212,165,116,.06);border:1px solid rgba(212,165,116,.22);border-radius:12px;padding:10px 12px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">${cat(sorted[0][0]).icon}</span>
+        <div style="flex:1">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--p-gold);font-weight:700">Top category</div>
+          <div style="font-family:var(--font-serif);font-size:17px;font-weight:600;color:var(--fg);margin-top:2px">${escapeHTML(sorted[0][0])}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--p-gold);font-variant-numeric:tabular-nums">${fmtNum(sorted[0][1])}</div>
+          <div style="font-size:10px;color:var(--fg-3);font-family:var(--font-mono)">${Math.round((sorted[0][1]/rangeTotal)*100)}% of spend</div>
+        </div>
+      </div>
+      <div class="donut-wrap">
+        ${donutSVG(sorted,rangeTotal)}
+        <div class="legend">
+          ${sorted.slice(0,5).map(([n,v])=>{const c=cat(n);const p=Math.round((v/rangeTotal)*100);return `
+            <div class="lg-row"><span class="lg-sw" style="background:${c.color}"></span><span class="lg-nm">${c.icon} ${escapeHTML(n)}</span><span class="lg-pc">${p}%</span></div>
+          `}).join('')}
+        </div>
+      </div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.05)">
+        ${sorted.map(([n,v])=>{const c=cat(n);const p=Math.round((v/rangeTotal)*100);return `
+          <div class="cat-bar">
+            <div class="cat-bar-top"><span>${c.icon} ${escapeHTML(n)}</span><span>${fmtMVR(v)} · ${p}%</span></div>
+            <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${p}%;background:${c.color}"></div></div>
+          </div>`}).join('')}
+      </div>
+    </div>`:''}
+
+    ${myCatSorted.length>0?`<div class="stats-card">
+      <div class="stats-card-hd"><h3>My personal · where I spend most</h3></div>
+      <div style="font-size:11px;color:var(--fg-3);margin-bottom:10px;font-family:var(--font-mono)">Only you see line items — categories shown to family</div>
+      ${myCatSorted.map(([n,v])=>{const c=cat(n);const p=myPersonalTotal>0?Math.round((v/myPersonalTotal)*100):0;return `
+        <div class="cat-bar">
+          <div class="cat-bar-top"><span>${c.icon} ${escapeHTML(n)}</span><span>${fmtMVR(v)} · ${p}%</span></div>
+          <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${p}%;background:${c.color}"></div></div>
+        </div>`}).join('')}
+    </div>`:''}
+
+    <div class="stats-card">
+      <div class="stats-card-hd"><h3>${year} · monthly trend</h3></div>
       <div class="bar-row">
         ${monthly.map(m=>`<div class="bar-col">
           <div class="bar ${m.isCur?'cur':''}" style="height:${Math.max(2,Math.round((m.total/max)*100))}%" title="${fmtMVR(m.total)}"></div>
@@ -1783,44 +1950,50 @@ function renderStats(){
     </div>
 
     <div class="stats-card">
-      <div class="stats-card-hd"><h3>Categories · ${new Date().toLocaleString('en',{month:'long'})}</h3></div>
-      ${sorted.length===0?`<div class="empty" style="padding:20px 0">No data this month</div>`:`
-        <div class="donut-wrap">
-          ${donutSVG(sorted,monthTotal)}
-          <div class="legend">
-            ${sorted.slice(0,5).map(([n,v])=>{const c=cat(n);const p=Math.round((v/monthTotal)*100);return `
-              <div class="lg-row"><span class="lg-sw" style="background:${c.color}"></span><span class="lg-nm">${c.icon} ${escapeHTML(n)}</span><span class="lg-pc">${p}%</span></div>
-            `}).join('')}
-          </div>
-        </div>
-        <div style="margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.05)">
-          ${sorted.map(([n,v])=>{const c=cat(n);const p=Math.round((v/monthTotal)*100);return `
-            <div class="cat-bar">
-              <div class="cat-bar-top"><span>${c.icon} ${escapeHTML(n)}</span><span>${fmtMVR(v)} · ${p}%</span></div>
-              <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${p}%;background:${c.color}"></div></div>
-            </div>`}).join('')}
-        </div>`}
-    </div>
-
-    <div class="stats-card">
-      <div class="stats-card-hd"><h3>Per member · household share</h3></div>
-      ${memSorted.length===0?`<div class="empty" style="padding:14px 0">No member spending yet</div>`:memSorted.map(([id,v])=>{const m=mem(id);if(!m)return'';const p=monthTotal>0?Math.round((v/monthTotal)*100):0;return `
-        <div class="pm-row">
-          <div class="pm-av">${memInitial(m.name)}</div>
-          <div class="pm-body">
-            <div class="pm-nm">${escapeHTML(m.name.split(' ').slice(0,2).join(' '))}<small>· ${escapeHTML(m.role)}</small></div>
-            <div class="pm-sub">${p}% of household share</div>
-          </div>
-          <div class="pm-net" style="color:var(--fg)">${fmtNum(v)}</div>
-        </div>`}).join('')}
+      <div class="stats-card-hd"><h3>Per member · household + personal · ${escapeHTML(rangeLabel())}</h3></div>
+      ${(()=>{
+        // Combined per-member: household share + their personal in this range
+        const householdShare={}, personalTotals={};
+        for(const m of state.members){
+          householdShare[m.id]=memberHouseShareRange(m.id);
+          personalTotals[m.id]=expensesInRange('all').filter(e=>e.scope==='personal' && e.paidBy===m.id).reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
+        }
+        const combined=state.members.map(m=>({m,hh:householdShare[m.id]||0,pn:personalTotals[m.id]||0,tot:(householdShare[m.id]||0)+(personalTotals[m.id]||0)})).filter(r=>r.tot>0).sort((a,b)=>b.tot-a.tot);
+        if(combined.length===0)return `<div class="empty" style="padding:14px 0">No spending yet in ${escapeHTML(rangeLabel().toLowerCase())}</div>`;
+        const maxTot=Math.max(...combined.map(r=>r.tot),1);
+        return combined.map(r=>{
+          const meSelf=r.m.id===meId;
+          const hPct=r.tot>0?Math.round((r.hh/r.tot)*100):0;
+          return `<div style="padding:10px 0;border-top:1px solid rgba(255,255,255,.05)">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+              <div class="pm-av" style="width:32px;height:32px;font-size:14px">${memInitial(r.m.name)}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600;color:var(--fg);letter-spacing:-.01em">${escapeHTML(r.m.name.split(' ').slice(0,2).join(' '))}${meSelf?'<small style="color:var(--p-gold);font-weight:700;margin-left:6px">YOU</small>':''}</div>
+                <div style="font-size:10px;color:var(--fg-3);font-family:var(--font-mono)">${escapeHTML(r.m.role)}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--fg);font-variant-numeric:tabular-nums">${fmtNum(r.tot)}</div>
+                <div style="font-size:9px;color:var(--fg-3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.08em;font-weight:700">total</div>
+              </div>
+            </div>
+            <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.04);margin-top:4px">
+              <div style="width:${hPct}%;background:var(--p-gold,var(--gold));opacity:.85"></div>
+              <div style="width:${100-hPct}%;background:#b39ddb;opacity:.7"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:5px;font-size:10px;font-family:var(--font-mono);color:var(--fg-2)">
+              <span><span style="color:var(--p-gold)">●</span> Household ${fmtNum(r.hh)}</span>
+              <span><span style="color:#b39ddb">●</span> Personal ${meSelf?fmtNum(r.pn):'•••'}</span>
+            </div>
+          </div>`;
+        }).join('');
+      })()}
     </div>
 
     ${(()=>{
-      // Personal spending across the family — category totals only, no descriptions
-      // (privacy-respecting view per Faathik's settings)
-      const allPersonal=state.expenses.filter(e=>e.date&&e.date.slice(0,7)===mk && e.type==='expense' && e.scope==='personal');
+      // Personal spending across the family — category totals only, no descriptions (your privacy preference)
+      const allPersonal=expensesInRange('all').filter(e=>e.scope==='personal');
       if(allPersonal.length===0)return '';
-      const byMemCat={}; // {memberId: {cat: total}}
+      const byMemCat={};
       const memTotals={};
       for(const e of allPersonal){
         const mid=e.paidBy;
@@ -1829,9 +2002,10 @@ function renderStats(){
         byMemCat[mid][e.category]=(byMemCat[mid][e.category]||0)+v;
         memTotals[mid]=(memTotals[mid]||0)+v;
       }
-      const sortedMems=Object.entries(memTotals).sort((a,b)=>b[1]-a[1]);
+      const sortedMems=Object.entries(memTotals).filter(([id])=>id!==meId).sort((a,b)=>b[1]-a[1]);
+      if(sortedMems.length===0)return '';
       return `<div class="stats-card">
-        <div class="stats-card-hd"><h3>Personal spending · by member</h3></div>
+        <div class="stats-card-hd"><h3>Others · personal spending categories</h3></div>
         <div style="font-size:11px;color:var(--fg-3);margin-bottom:10px;font-family:var(--font-mono)">Categories shown only — descriptions stay private</div>
         ${sortedMems.map(([mid,total])=>{
           const m=mem(mid);if(!m)return'';
@@ -2052,9 +2226,24 @@ function renderMore(){
 
     <div class="stats-card">
       <div class="stats-card-hd"><h3>Family members</h3>${isHead?'<span class="more" onclick="openMember()" style="font-size:11px;color:var(--p-gold,var(--gold));cursor:pointer;font-weight:600">+ ADD</span>':''}</div>
+      ${(()=>{
+        // Suggest auto-adding the rest of the family if some preset names are missing
+        if(!isHead)return '';
+        const existing=new Set(state.members.map(x=>x.name.trim().toLowerCase()));
+        const missing=SEED_MEMBERS.filter(s=>!existing.has(s.name.toLowerCase()));
+        if(missing.length===0)return '';
+        return `<div style="background:rgba(212,165,116,.06);border:1px solid rgba(212,165,116,.22);border-radius:12px;padding:12px;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+            <span style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--p-gold);font-weight:700">Add the rest of the family</span>
+            <span style="font-family:var(--font-mono);font-size:11px;color:var(--fg-3);font-weight:600">${missing.length} missing</span>
+          </div>
+          <div style="font-size:12px;color:var(--fg-2);margin-bottom:10px;line-height:1.45">${missing.map(s=>escapeHTML(s.name.split(' ')[0])).join(', ')}</div>
+          <button onclick="addSuggestedFamily()" style="width:100%;background:color-mix(in oklab,var(--p-gold) 18%, transparent);color:var(--p-gold);border:1px solid color-mix(in oklab,var(--p-gold) 38%, transparent);padding:9px;border-radius:10px;font-weight:700;font-size:12px;cursor:pointer">+ Add all ${missing.length} members</button>
+        </div>`;
+      })()}
       ${state.members.map(mb=>`<div class="list-row" onclick="${isHead||mb.id===m.id?`openMember('${mb.id}')`:''}">
         <div class="list-ic" style="border-radius:50%;background:linear-gradient(135deg,color-mix(in oklab,var(--p-gold) 25%,transparent),color-mix(in oklab,var(--p-gold) 6%,transparent));color:var(--p-gold);font-family:var(--font-serif);font-size:14px">${memInitial(mb.name)}</div>
-        <div class="list-body"><div class="list-pri">${escapeHTML(mb.name)}</div><div class="list-sec">${escapeHTML(mb.role)} · ${escapeHTML(mb.workplace||'—')}</div></div>
+        <div class="list-body"><div class="list-pri">${escapeHTML(mb.name.split(' ').slice(0,3).join(' '))}</div><div class="list-sec">${escapeHTML(mb.role)} · ${escapeHTML(mb.workplace||'—')}</div></div>
         <div class="list-rt gd">${fmtNum((+mb.monthlyIncome?.[monthKey()]||+mb.monthlyIncome?.default||0)/1000)}k</div>
       </div>`).join('')}
     </div>
@@ -2075,30 +2264,11 @@ function renderMore(){
     </div>`:`<div class="sync-card-m"><div class="top"><div class="ic">📴</div><div><div class="st-lab">Local only</div><div class="st-tm">Sign in with Google to sync</div></div></div><div class="sync-btns"><div class="sync-btn" onclick="signIn()">Sign in</div><div class="sync-btn" onclick="exportJSON()">Export</div></div></div>`}
 
     <div class="stats-card">
-      <div class="stats-card-hd"><h3>Theme</h3></div>
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-3);font-weight:700;margin-top:4px;margin-bottom:2px">Palette</div>
-      <div class="theme-row">
-        ${Object.entries(PALETTES).map(([k,p])=>`<div class="theme-opt ${theme.palette===k?'act':''}" onclick="applyTheme('${k}',null,null)">
-          <div class="swatches"><span class="sw" style="background:${p.base}"></span><span class="sw" style="background:${p.top}"></span><span class="sw" style="background:${p.gold}"></span></div>
-          <div class="nm">${p.label}</div>
-          <div class="sub">${p.sub}</div>
-        </div>`).join('')}
-      </div>
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-3);font-weight:700;margin-top:14px;margin-bottom:2px">Density</div>
-      <div class="tweak-seg">
-        ${['cozy','regular','airy'].map(d=>`<button class="${theme.density===d?'act':''}" onclick="applyTheme(null,'${d}',null)">${d}</button>`).join('')}
-      </div>
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-3);font-weight:700;margin-top:14px;margin-bottom:2px">Mood</div>
-      <div class="tweak-seg">
-        ${['editorial','bold','minimal'].map(d=>`<button class="${theme.mood===d?'act':''}" onclick="applyTheme(null,null,'${d}')">${d}</button>`).join('')}
-      </div>
-    </div>
-
-    <div class="stats-card">
       <div class="stats-card-hd"><h3>Settings</h3></div>
       <div class="list-row" onclick="go('budget')"><div class="list-ic">🎯</div><div class="list-body"><div class="list-pri">Budgets</div><div class="list-sec">Set monthly spending limits</div></div><div class="list-rt">›</div></div>
       <div class="list-row" onclick="openFamilyLoan()"><div class="list-ic">⇄</div><div class="list-body"><div class="list-pri">Record an IOU</div><div class="list-sec">Track money lent between family</div></div><div class="list-rt">›</div></div>
       ${isHead&&session.mode==='cloud'?`<div class="list-row" onclick="openShareWithFamily()"><div class="list-ic">📤</div><div class="list-body"><div class="list-pri">Share with family</div><div class="list-sec">Give each member access via their own Gmail</div></div><div class="list-rt">›</div></div>`:''}
+      <div class="list-row" onclick="openThemePicker()"><div class="list-ic">🎨</div><div class="list-body"><div class="list-pri">Theme &amp; density</div><div class="list-sec">${escapeHTML(PALETTES[theme.palette]?.label||'Midnight')} · ${escapeHTML(theme.density||'regular')} · ${escapeHTML(theme.mood||'bold')}</div></div><div class="list-rt">›</div></div>
       <div class="list-row" onclick="openFx()"><div class="list-ic">💱</div><div class="list-body"><div class="list-pri">Exchange rate</div><div class="list-sec">1 USD = ${state.meta.fxRate||DEFAULT_FX} MVR</div></div><div class="list-rt">›</div></div>
       <div class="list-row" onclick="exportJSON()"><div class="list-ic">📥</div><div class="list-body"><div class="list-pri">Export data (JSON)</div><div class="list-sec">Backup to a file</div></div><div class="list-rt">›</div></div>
       <div class="list-row" onclick="switchUser()"><div class="list-ic">👤</div><div class="list-body"><div class="list-pri">Switch user</div><div class="list-sec">Pick a different family member</div></div><div class="list-rt">›</div></div>
@@ -2556,6 +2726,126 @@ function saveSav(){
 }
 function deleteSav(){const i=state.savings.findIndex(x=>x.id===savDraft.id);if(i>=0){state.savings.splice(i,1);saveState();closeModal();rerenderAll();toast('Deleted')}}
 
+/* ============== THEME PICKER MODAL ============== */
+function openThemePicker(){
+  const theme=state.meta.theme||{palette:'midnight',density:'regular',mood:'bold'};
+  openModal(`
+    <div class="modal-hd"><h3>Theme &amp; density</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-3);font-weight:700;margin-bottom:8px">Palette</div>
+    <div class="theme-row">
+      ${Object.entries(PALETTES).map(([k,p])=>`<div class="theme-opt ${theme.palette===k?'act':''}" onclick="applyTheme('${k}',null,null);openThemePicker()">
+        <div class="swatches"><span class="sw" style="background:${p.base}"></span><span class="sw" style="background:${p.top}"></span><span class="sw" style="background:${p.gold}"></span></div>
+        <div class="nm">${p.label}</div>
+        <div class="sub">${p.sub}</div>
+      </div>`).join('')}
+    </div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-3);font-weight:700;margin-top:18px;margin-bottom:8px">Density</div>
+    <div class="tweak-seg">
+      ${['cozy','regular','airy'].map(d=>`<button class="${theme.density===d?'act':''}" onclick="applyTheme(null,'${d}',null);openThemePicker()">${d}</button>`).join('')}
+    </div>
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-3);font-weight:700;margin-top:18px;margin-bottom:8px">Mood</div>
+    <div class="tweak-seg">
+      ${['editorial','bold','minimal'].map(d=>`<button class="${theme.mood===d?'act':''}" onclick="applyTheme(null,null,'${d}');openThemePicker()">${d}</button>`).join('')}
+    </div>
+    <div class="modal-actions">
+      <button class="primary-btn" onclick="closeModal()">Done</button>
+    </div>
+  `);
+}
+
+/* ============== HOUSE DETAIL MODAL ============== */
+let houseDetailState={houseId:null, range:'month'}; // 'day' | 'week' | 'month' | 'year'
+function openHouseDetail(houseId){
+  houseDetailState={houseId, range:'month'};
+  renderHouseDetail();
+}
+function renderHouseDetail(){
+  const {houseId, range}=houseDetailState;
+  const h=HOUSES.find(x=>x.id===houseId);if(!h)return;
+  // Determine range start
+  const today=new Date();
+  let start=new Date(today);
+  let label='';
+  if(range==='day'){start.setHours(0,0,0,0);label='Today'}
+  else if(range==='week'){start.setDate(today.getDate()-6);start.setHours(0,0,0,0);label='Last 7 days'}
+  else if(range==='month'){start=new Date(today.getFullYear(),today.getMonth(),1);label=today.toLocaleString('en',{month:'long'})}
+  else if(range==='year'){start=new Date(today.getFullYear(),0,1);label=String(today.getFullYear())}
+  const startISO=start.toISOString().slice(0,10);
+  // Filter household expenses for this house in the range
+  const exps=state.expenses.filter(e=>e.scope!=='personal' && e.type==='expense' && (e.house===houseId || e.house==='both') && e.date>=startISO);
+  const total=exps.reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
+  // By category
+  const byCat={};
+  exps.forEach(e=>{const v=toMVR(e.amount,e.currency||'MVR');byCat[e.category]=(byCat[e.category]||0)+v});
+  const sortedCats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  // By member (who paid out of pocket)
+  const byMem={};
+  exps.forEach(e=>{byMem[e.paidBy]=(byMem[e.paidBy]||0)+toMVR(e.amount,e.currency||'MVR')});
+  const sortedMems=Object.entries(byMem).sort((a,b)=>b[1]-a[1]);
+  // Recent transactions in this house
+  const recent=[...exps].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,10);
+  openModal(`
+    <div class="modal-hd"><h3>${h.em} ${escapeHTML(h.label)}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+
+    <div style="display:flex;gap:6px;background:rgba(255,255,255,.04);border-radius:12px;padding:4px;margin-bottom:14px">
+      ${[['day','Today'],['week','Week'],['month','Month'],['year','Year']].map(([r,lab])=>`
+        <button onclick="houseDetailState.range='${r}';renderHouseDetail()" style="flex:1;padding:8px 10px;border:none;border-radius:8px;font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;background:${range===r?'color-mix(in oklab,var(--p-gold) 18%,transparent)':'transparent'};color:${range===r?'var(--p-gold)':'var(--fg-2)'}">${lab}</button>
+      `).join('')}
+    </div>
+
+    <div style="text-align:center;padding:18px 0 6px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--fg-3);font-weight:700">Total spent · ${label}</div>
+      <div style="font-family:var(--font-serif);font-size:38px;font-weight:400;color:${h.id==='hiya'?'#5b9bd9':'#5ec88c'};margin-top:6px;letter-spacing:-.02em;font-variant-numeric:tabular-nums">${fmtNum(total)} <span style="font-family:var(--font-mono);font-size:13px;color:var(--fg-3);font-weight:600">MVR</span></div>
+      <div style="font-size:11px;color:var(--fg-3);margin-top:4px;font-family:var(--font-mono)">${exps.length} transaction${exps.length===1?'':'s'}</div>
+    </div>
+
+    ${sortedCats.length===0?`<div class="empty" style="padding:24px 0">No expenses in ${label.toLowerCase()}</div>`:`
+      <div style="margin-top:16px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-2);font-weight:700;margin-bottom:10px">By category</div>
+        ${sortedCats.map(([cn,v])=>{const c=cat(cn);const p=total>0?Math.round((v/total)*100):0;return `
+          <div style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">
+              <span style="font-size:13px;font-weight:600;color:var(--fg)"><span style="margin-right:6px">${c.icon}</span>${escapeHTML(cn)}</span>
+              <span style="font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--fg-1);font-variant-numeric:tabular-nums">${fmtNum(v)} <small style="color:var(--fg-3);font-weight:500">· ${p}%</small></span>
+            </div>
+            <div style="height:6px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:${p}%;background:${c.color};border-radius:3px;box-shadow:0 0 6px ${c.color}66"></div>
+            </div>
+          </div>`}).join('')}
+      </div>
+
+      ${sortedMems.length>1?`<div style="margin-top:18px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-2);font-weight:700;margin-bottom:10px">Who paid</div>
+        ${sortedMems.map(([id,v])=>{const m=mem(id);if(!m)return'';const p=total>0?Math.round((v/total)*100):0;return `
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 0">
+            <div class="pm-av" style="width:28px;height:28px;font-size:12px">${memInitial(m.name)}</div>
+            <div style="flex:1;font-size:13px;font-weight:600;color:var(--fg)">${escapeHTML(m.name.split(' ').slice(0,2).join(' '))}<small style="color:var(--fg-3);margin-left:6px">· ${p}%</small></div>
+            <div style="font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--fg-1);font-variant-numeric:tabular-nums">${fmtNum(v)}</div>
+          </div>`}).join('')}
+      </div>`:''}
+
+      <div style="margin-top:18px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-2);font-weight:700">Recent transactions</div>
+          <div onclick="closeModal();setTxFilter('house','${houseId}');go('tx')" style="font-size:10px;color:var(--p-gold);font-weight:700;cursor:pointer">SEE ALL ›</div>
+        </div>
+        ${recent.map(e=>{const c=cat(e.category);const by=mem(e.paidBy);return `
+          <div class="list-row" onclick="closeModal();openTx('${e.id}')">
+            <div class="list-ic" style="background:${c.color}22;color:${c.color}">${c.icon}</div>
+            <div class="list-body">
+              <div class="list-pri">${escapeHTML(e.description||e.category)}</div>
+              <div class="list-sec">${dateRel(e.date)}${by?' · '+escapeHTML(by.name.split(' ')[0]):''}</div>
+            </div>
+            <div class="list-rt rd">−${fmtNum(toMVR(e.amount,e.currency||'MVR'))}</div>
+          </div>`}).join('')}
+      </div>
+    `}
+    <div class="modal-actions">
+      <button class="primary-btn" onclick="closeModal()">Done</button>
+    </div>
+  `);
+}
+
 /* ============== FAMILY LENDING MODAL ============== */
 let famLoanDraft=null;
 function openFamilyLoan(id){
@@ -2765,6 +3055,20 @@ function delBudget(cat){const i=state.budgets.findIndex(b=>b.category===cat);if(
 
 /* ============== MEMBER MODAL ============== */
 let memDraft=null;
+function addSuggestedFamily(){
+  if(session.currentMember?.role!=='Head'){toast('Only Head can add family');return}
+  const existing=new Set(state.members.map(x=>x.name.trim().toLowerCase()));
+  const missing=SEED_MEMBERS.filter(s=>!existing.has(s.name.toLowerCase()));
+  if(missing.length===0){toast('All family already added');return}
+  if(state.members.length+missing.length>MAX_MEMBERS){toast(`Would exceed ${MAX_MEMBERS} members`);return}
+  for(const s of missing){
+    state.members.push({
+      id:uid('m'),name:s.name,role:s.role,workplace:'',livesIn:s.livesIn,
+      monthlyIncome:{default:0,[monthKey()]:0},contribution:0,pin:'',notes:''
+    });
+  }
+  saveState();rerenderAll();toast(`Added ${missing.length} family member${missing.length===1?'':'s'}`);
+}
 function openMember(id){
   const isHead=session.currentMember?.role==='Head';
   if(id){const m=mem(id);if(!m)return;memDraft={...m,_isNew:false}}
