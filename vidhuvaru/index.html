@@ -275,22 +275,22 @@
   .hero .delta .sub{color:var(--fg-2);margin-left:2px;font-weight:500}
 
   /* INCOME / OUT panel */
-  .io{margin:18px 18px 22px;display:grid;grid-template-columns:1fr 1px 1fr;
+  .io{margin:18px 18px 22px;display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr;
     background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
-    border-radius:var(--d-card-r);padding:var(--d-card-py) 8px;
+    border-radius:var(--d-card-r);padding:var(--d-card-py) 4px;
     backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
     box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
-  .io .col{padding:0 14px}
+  .io .col{padding:0 8px;min-width:0}
   .io .divider{background:rgba(255,255,255,.06)}
-  .io .lab{display:flex;align-items:center;gap:6px;font-size:10px;text-transform:uppercase;
-    letter-spacing:.12em;color:var(--fg-2);font-weight:700;margin-bottom:8px}
-  .io .lab .pip{width:6px;height:6px;border-radius:50%}
+  .io .lab{display:flex;align-items:center;gap:5px;font-size:9.5px;text-transform:uppercase;
+    letter-spacing:.10em;color:var(--fg-2);font-weight:700;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .io .lab .pip{width:6px;height:6px;border-radius:50%;flex-shrink:0}
   .io .lab.in  .pip{background:var(--green-400);box-shadow:0 0 6px rgba(94,200,140,.6)}
   .io .lab.out .pip{background:var(--red-400);box-shadow:0 0 6px rgba(255,107,92,.5)}
-  .io .val{font-family:var(--font-serif);font-size:26px;font-weight:500;letter-spacing:-.025em;
-    line-height:1.05;color:var(--fg);font-variant-numeric:tabular-nums}
-  .io .val .cents{font-family:var(--font-sans);font-size:11px;color:var(--fg-2);font-weight:600}
-  .io .sub{font-size:10.5px;color:var(--fg-3);font-family:var(--font-mono);margin-top:3px}
+  .io .val{font-family:var(--font-serif);font-size:22px;font-weight:500;letter-spacing:-.025em;
+    line-height:1.05;color:var(--fg);font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis}
+  .io .val .cents{font-family:var(--font-sans);font-size:10px;color:var(--fg-2);font-weight:600}
+  .io .sub{font-size:9.5px;color:var(--fg-3);font-family:var(--font-mono);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
   /* SECTION HEADER */
   .section-h{display:flex;align-items:baseline;justify-content:space-between;padding:0 24px 14px;margin-top:6px}
@@ -1576,11 +1576,19 @@ function familyLendingBalance(memberId){
 /* ============== DASHBOARD ============== */
 function renderDashboard(){
   const mk=monthKey();
+  const meId=session.currentMember?.id;
+  const me=session.currentMember||state.members[0];
   const exps=monthExpenses(mk,'household');
   const monthSpend=exps.reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
   const monthInc=familyMonthlyIncome(mk);
   const monthLoan=totalMonthlyLoanPay();
-  const net=netPosition();
+
+  // Personal hero: my income, my personal spend, my household share, my net leftover
+  const myInc = me ? (+me.monthlyIncome?.[mk]||+me.monthlyIncome?.default||0) : 0;
+  const myPersonalExps = state.expenses.filter(e=>e.date&&e.date.slice(0,7)===mk && e.type==='expense' && e.scope==='personal' && e.paidBy===meId);
+  const myPersonalSpend = myPersonalExps.reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
+  const myShare = memberHouseShare(meId, mk);
+  const myNet = myInc - myPersonalSpend - myShare;
 
   // 6 month spending history for trend (household only)
   const months=[];const now=new Date();
@@ -1596,8 +1604,8 @@ function renderDashboard(){
   const vidhuSpend=exps.filter(e=>e.house==='vidhuvaru'||e.house==='both').reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
   const houseTot=hiyaSpend+vidhuSpend||1;
 
-  // recent transactions (household scope only on family dashboard)
-  const recent=[...state.expenses].filter(e=>e.scope!=='personal').sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.id||'').localeCompare(a.id||'')).slice(0,5);
+  // recent transactions (household scope + my own personal)
+  const recent=[...state.expenses].filter(e=>e.scope!=='personal' || e.paidBy===meId).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.id||'').localeCompare(a.id||'')).slice(0,5);
 
   // accounts strip
   const accs=state.accounts.slice(0,10);
@@ -1606,53 +1614,57 @@ function renderDashboard(){
   // per-member breakdown for the household this month: their SHARE of household bills
   const memberRows=state.members.map(m=>{
     const inc=(+m.monthlyIncome?.[mk]||+m.monthlyIncome?.default||0);
-    const share=memberHouseShare(m.id,mk);                   // their portion of household bills
-    const paid=memberHousePaid(m.id,mk);                     // what they actually paid out
+    const share=memberHouseShare(m.id,mk);
+    const paid=memberHousePaid(m.id,mk);
     const loans=state.loans.filter(l=>l.borrower===m.id&&l.status==='active').reduce((s,l)=>s+(+l.monthlyPayment||0),0);
-    return {m,inc,share,paid,loans,net:paid-share}; // positive = lent to household; negative = owes household
+    return {m,inc,share,paid,loans,net:paid-share};
   });
 
-  // Format net: split into whole and cents
-  const netAbs=Math.abs(net);
+  // Hero (PERSONAL view) — split whole/cents
+  const netAbs=Math.abs(myNet);
   const netWhole=Math.floor(netAbs).toLocaleString('en-US');
   const netCents=(netAbs - Math.floor(netAbs)).toFixed(2).slice(1);
   const monthName=new Date().toLocaleString('en',{month:'long'});
 
-  // Income whole/cents
-  const incWhole=Math.floor(monthInc).toLocaleString('en-US');
-  const incCents=(monthInc - Math.floor(monthInc)).toFixed(2).slice(1);
-  const spendWhole=Math.floor(monthSpend).toLocaleString('en-US');
-  const spendCents=(monthSpend - Math.floor(monthSpend)).toFixed(2).slice(1);
-  const budgetSetTotal=state.budgets.reduce((s,b)=>s+(+b.monthlyLimit||0),0);
-  const budgetPctTxt=budgetSetTotal>0?`${Math.round((monthSpend/budgetSetTotal)*100)}% of budget`:`${state.expenses.filter(e=>e.date&&e.date.slice(0,7)===mk).length} transactions`;
-  const incSubTxt=state.members.filter(m=>(+m.monthlyIncome?.[mk]||+m.monthlyIncome?.default||0)>0).length+' earners this month';
+  // Mini stats: my income, my personal spent, my household share
+  const incWhole=Math.floor(myInc).toLocaleString('en-US');
+  const incCents=(myInc - Math.floor(myInc)).toFixed(2).slice(1);
+  const persWhole=Math.floor(myPersonalSpend).toLocaleString('en-US');
+  const persCents=(myPersonalSpend - Math.floor(myPersonalSpend)).toFixed(2).slice(1);
+  const shareWhole=Math.floor(myShare).toLocaleString('en-US');
+  const shareCents=(myShare - Math.floor(myShare)).toFixed(2).slice(1);
+  const myFirstName = (me?.name||'You').split(' ')[0];
 
   $('tabDashboard').innerHTML=`
     <div class="hero">
-      <div class="eyebrow">Family net <span class="month">· ${monthName}</span></div>
+      <div class="eyebrow">${escapeHTML(myFirstName)}'s ${monthName} <span class="month">· left to spend</span></div>
       <div class="amount-row">
         <span class="ccy">MVR</span>
-        <span class="big ${net<0?'neg':''}">${net<0?'−':''}${netWhole}</span>
+        <span class="big ${myNet<0?'neg':''}">${myNet<0?'−':''}${netWhole}</span>
         <span class="cents">${netCents}</span>
       </div>
-      ${trendPct!==0?`<div class="delta ${trend<0?'':'dn'}" style="${trend<0?'background:rgba(94,200,140,.12);border-color:rgba(94,200,140,.22);color:var(--green-400)':'background:rgba(255,107,92,.12);border-color:rgba(255,107,92,.22);color:var(--red-400)'}">
-        <span class="arrow">${trend<0?'↓':'↑'}</span>
-        <span>${fmtMVR(Math.abs(trend))}</span>
-        <span class="sub">${trend<0?'less spent':'more spent'} vs ${months[4].label}</span>
-      </div>`:''}
+      <div style="margin-top:14px;font-size:11px;color:var(--fg-3);font-family:var(--font-mono);letter-spacing:.04em">
+        Income ${fmtNum(myInc)} − Personal ${fmtNum(myPersonalSpend)} − Household share ${fmtNum(myShare)}
+      </div>
     </div>
 
     <div class="io">
       <div class="col">
-        <div class="lab in"><span class="pip"></span>Income</div>
+        <div class="lab in"><span class="pip"></span>My income</div>
         <div class="val">${incWhole}<span class="cents">${incCents}</span></div>
-        <div class="sub">${incSubTxt}</div>
+        <div class="sub">${myInc>0?'this month':'tap to set'}</div>
       </div>
       <div class="divider"></div>
       <div class="col">
-        <div class="lab out"><span class="pip"></span>Spent</div>
-        <div class="val">${spendWhole}<span class="cents">${spendCents}</span></div>
-        <div class="sub">${budgetPctTxt}${monthLoan>0?' · '+fmtNum(monthLoan/1000)+'k loans':''}</div>
+        <div class="lab out"><span class="pip"></span>Personal</div>
+        <div class="val">${persWhole}<span class="cents">${persCents}</span></div>
+        <div class="sub">${myPersonalExps.length} expense${myPersonalExps.length===1?'':'s'}</div>
+      </div>
+      <div class="divider"></div>
+      <div class="col">
+        <div class="lab out"><span class="pip" style="background:var(--p-gold,var(--gold))"></span>My share</div>
+        <div class="val">${shareWhole}<span class="cents">${shareCents}</span></div>
+        <div class="sub">of household bills</div>
       </div>
     </div>
 
@@ -2111,6 +2123,53 @@ function renderMore(){
       </div>
       <button class="prof-edit" onclick="openMember('${m.id}')">Edit</button>
     </div>
+
+    ${(()=>{
+      // FAMILY SNAPSHOT — family-wide aggregate (moved from main dashboard)
+      const famNet=netPosition();
+      const famInc=familyMonthlyIncome(monthKey());
+      const famSpend=monthExpenses(monthKey(),'household').reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
+      const totalSav=totalSavings();
+      const totalAcc=accountBalanceMVR();
+      const totalLoanBal=totalLoans();
+      const totalMonLoan=totalMonthlyLoanPay();
+      const activeLoans=state.loans.filter(l=>l.status==='active').length;
+      const netAbs=Math.abs(famNet);
+      const netWhole=Math.floor(netAbs).toLocaleString('en-US');
+      const netCents=(netAbs - Math.floor(netAbs)).toFixed(2).slice(1);
+      return `<div class="stats-card" style="background:linear-gradient(180deg,rgba(212,165,116,.05),rgba(212,165,116,.02));border:1px solid color-mix(in oklab,var(--p-gold) 22%, transparent)">
+        <div class="stats-card-hd"><h3>Family snapshot · ${new Date().toLocaleString('en',{month:'long'})}</h3></div>
+
+        <div style="text-align:center;padding:14px 0 18px;border-bottom:1px solid rgba(255,255,255,.05);margin-bottom:14px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--fg-3);font-weight:700">Family net position</div>
+          <div style="font-family:var(--font-serif);font-size:36px;font-weight:400;color:${famNet<0?'var(--red-400)':'var(--green-400)'};margin-top:6px;letter-spacing:-.025em;font-variant-numeric:tabular-nums">${famNet<0?'−':''}${netWhole}<span style="font-family:var(--font-sans);font-size:14px;color:var(--fg-2);font-weight:600">${netCents}</span></div>
+          <div style="font-size:10.5px;color:var(--fg-3);margin-top:4px;font-family:var(--font-mono)">Savings + accounts − loans · MVR</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div style="padding:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px">
+            <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--green-400);font-weight:700">Family income</div>
+            <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--fg);margin-top:4px;font-variant-numeric:tabular-nums">${fmtNum(famInc)}</div>
+            <div style="font-size:10px;color:var(--fg-3);margin-top:2px;font-family:var(--font-mono)">${state.members.filter(x=>(+x.monthlyIncome?.[monthKey()]||+x.monthlyIncome?.default||0)>0).length} earner${state.members.filter(x=>(+x.monthlyIncome?.[monthKey()]||+x.monthlyIncome?.default||0)>0).length===1?'':'s'}</div>
+          </div>
+          <div style="padding:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px">
+            <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--red-400);font-weight:700">Household spent</div>
+            <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--fg);margin-top:4px;font-variant-numeric:tabular-nums">${fmtNum(famSpend)}</div>
+            <div style="font-size:10px;color:var(--fg-3);margin-top:2px;font-family:var(--font-mono)">this month</div>
+          </div>
+          <div style="padding:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px">
+            <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--fg-2);font-weight:700">Savings + accounts</div>
+            <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--fg);margin-top:4px;font-variant-numeric:tabular-nums">${fmtNum(totalSav+totalAcc)}</div>
+            <div style="font-size:10px;color:var(--fg-3);margin-top:2px;font-family:var(--font-mono)">${fmtNum(totalSav)} sav + ${fmtNum(totalAcc)} acc</div>
+          </div>
+          <div style="padding:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px">
+            <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--fg-2);font-weight:700">Loans outstanding</div>
+            <div style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:${totalLoanBal>0?'var(--red-400)':'var(--fg)'};margin-top:4px;font-variant-numeric:tabular-nums">${fmtNum(totalLoanBal)}</div>
+            <div style="font-size:10px;color:var(--fg-3);margin-top:2px;font-family:var(--font-mono)">${activeLoans} active · ${fmtNum(totalMonLoan)}/mo</div>
+          </div>
+        </div>
+      </div>`;
+    })()}
 
     <div class="stats-card">
       <div class="stats-card-hd"><h3>My finance · ${new Date().toLocaleString('en',{month:'long'})}</h3></div>
