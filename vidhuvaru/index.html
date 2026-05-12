@@ -975,7 +975,7 @@ const DATA_FILE='vidhuvaru-data.json';
 const LS='vidhuvaru:';
 const SYNC_DELAY=3000;
 const RETRY_DELAY=30000;
-const VERSION='5.0';
+const VERSION='5.0.1';
 const DEFAULT_FX=15.42; // MVR per 1 USD (Maldivian pegged rate)
 
 // Pre-seeded family member names (used in setup screen as defaults)
@@ -1159,13 +1159,18 @@ function loadState(){const s=lsGet('state');if(s){migrate(s);state=Object.assign
 /* Central rule: items have a `createdBy` member id, and optionally a `sharedWith[]` array.
    visibleToMe(item) returns true if the currently logged-in member is the creator OR in sharedWith.
    Accounts ignore sharedWith — they're ALWAYS strictly creator-only.
-   If there's no logged-in member (e.g. on the setup screen), nothing is filtered (return true). */
+   LEGACY rule (v5.0 transitional): if an item has no createdBy, or its createdBy doesn't
+   match any current member id, treat it as legacy/public — visible to everyone. This
+   prevents migrated v4.x data from disappearing if creator IDs got reshuffled. */
 function currentMemberId(){return session.currentMember?.id || null}
+function isKnownMemberId(id){return !!id && Array.isArray(state.members) && state.members.some(m=>m.id===id)}
 function visibleToMe(item, opts){
   if(!item)return false;
   const me = currentMemberId();
   if(!me)return true; // pre-login views (setup, debug) show everything
-  if(item.createdBy && item.createdBy === me)return true;
+  // Legacy item — no creator or creator no longer in family → visible to all
+  if(!item.createdBy || !isKnownMemberId(item.createdBy))return true;
+  if(item.createdBy === me)return true;
   if(opts && opts.strict)return false; // accounts: only creator
   if(Array.isArray(item.sharedWith) && item.sharedWith.includes(me))return true;
   return false;
@@ -1216,8 +1221,13 @@ function renderShareSection(draftName, item, creator){
   `;
 }
 function toggleShareMember(draftName, memberId){
-  const draft = window[draftName] || globalThis[draftName];
-  if(!draft)return;
+  // Each draft is a module-scoped `let`, so window[draftName] doesn't work.
+  // Reference each one explicitly.
+  let draft = null;
+  if(draftName==='loanDraft')draft = loanDraft;
+  else if(draftName==='savDraft')draft = savDraft;
+  else if(draftName==='famLoanDraft')draft = famLoanDraft;
+  if(!draft){console.warn('toggleShareMember: no draft for',draftName);return}
   if(!Array.isArray(draft.sharedWith))draft.sharedWith=[];
   const idx = draft.sharedWith.indexOf(memberId);
   if(idx>=0)draft.sharedWith.splice(idx,1);
