@@ -975,7 +975,13 @@ const DATA_FILE='vidhuvaru-data.json';
 const LS='vidhuvaru:';
 const SYNC_DELAY=3000;
 const RETRY_DELAY=30000;
-const VERSION='5.0.1';
+const VERSION='5.0.2';
+/* FEATURE QUEUE (deferred until v5.0.2 is stable for 3-7 days):
+   1. Budgets with warnings — set monthly limits per category (USER PRIORITY #1)
+   2. Loan amortization — extra-payment calculator
+   3. Goal tracking — Hajj fund, house renovation progress
+   4. Photo receipts upgraded — camera + OCR + larger storage
+*/
 const DEFAULT_FX=15.42; // MVR per 1 USD (Maldivian pegged rate)
 
 // Pre-seeded family member names (used in setup screen as defaults)
@@ -1153,7 +1159,70 @@ function migrate(s){
   s.meta.version=VERSION;
   return s;
 }
-function loadState(){const s=lsGet('state');if(s){migrate(s);state=Object.assign(state,s)}if(!state.meta.fxRate)state.meta.fxRate=DEFAULT_FX;if(!state.meta.version)state.meta.version=VERSION;if(!Array.isArray(state.familyLoans))state.familyLoans=[];if(!Array.isArray(state.subscriptions))state.subscriptions=[]}
+function loadState(){const s=lsGet('state');if(s){migrate(s);state=Object.assign(state,s)}if(!state.meta.fxRate)state.meta.fxRate=DEFAULT_FX;if(!state.meta.version)state.meta.version=VERSION;if(!Array.isArray(state.familyLoans))state.familyLoans=[];if(!Array.isArray(state.subscriptions))state.subscriptions=[];healOrphanIds()}
+
+/* ============== ORPHAN ID HEAL (v5.0.2) ==============
+   Earlier merges created records with member IDs that no longer match any current
+   family member (e.g. `m1778499767287` when the current Head is `mp12drl21j6allj4jui`).
+   This heal scans all records and, where the role is unambiguous (only one Head, etc.),
+   rewrites orphan IDs to the matching current member. Runs once per device. */
+function healOrphanIds(){
+  if(state.meta?.healedOrphans)return;        // already done
+  if(!Array.isArray(state.members) || state.members.length===0)return;
+
+  const memberIds = new Set(state.members.map(m=>m.id));
+  // Build role → unique member map. Only roles with exactly ONE member are eligible.
+  const byRole = {};
+  for(const m of state.members){
+    const r = (m.role||'').toLowerCase();
+    if(!r)continue;
+    if(byRole[r])byRole[r].push(m);
+    else byRole[r]=[m];
+  }
+  const uniqueHead = byRole['head'] && byRole['head'].length===1 ? byRole['head'][0] : null;
+  // Fallback: if no Head role, fall back to the first member (usually the creator).
+  const fallback = uniqueHead || state.members[0];
+  if(!fallback)return;
+
+  let fixed = 0;
+  const fix = (id) => {
+    if(!id)return id;
+    if(memberIds.has(id))return id;  // already valid, leave alone
+    fixed++;
+    return fallback.id;
+  };
+
+  for(const e of (state.expenses||[])){e.paidBy = fix(e.paidBy)}
+  for(const l of (state.loans||[])){
+    l.borrower  = fix(l.borrower);
+    l.createdBy = fix(l.createdBy);
+  }
+  for(const s of (state.savings||[])){
+    s.by        = fix(s.by);
+    s.createdBy = fix(s.createdBy);
+  }
+  for(const fl of (state.familyLoans||[])){
+    fl.lender    = fix(fl.lender);
+    fl.borrower  = fix(fl.borrower);
+    fl.createdBy = fix(fl.createdBy);
+  }
+  for(const a of (state.accounts||[])){
+    a.owner     = fix(a.owner);
+    a.createdBy = fix(a.createdBy);
+  }
+  for(const sub of (state.subscriptions||[])){
+    sub.paidBy = fix(sub.paidBy);
+  }
+
+  state.meta = state.meta || {};
+  state.meta.healedOrphans = true;
+  state.meta.healedOrphansCount = fixed;
+  state.meta.healedOrphansAt = new Date().toISOString();
+  if(fixed>0){
+    console.log(`[heal] Fixed ${fixed} orphan member ID(s) — re-tagged to ${fallback.name}`);
+    lsSet('state', state);
+  }
+}
 
 /* ============== PRIVACY FILTER (v5.0) ============== */
 /* Central rule: items have a `createdBy` member id, and optionally a `sharedWith[]` array.
@@ -1279,6 +1348,7 @@ async function refreshToken(){
 }
 function signOutGoogle(){
   session.googleToken=null;session.tokenExpiry=0;session.mode='local';session.googleEmail=null;
+  session.pulledThisSession=false;
   lsDel('gtoken');lsDel('googleEmail');lsDel('lastMember');
   stopAutoPull();
   toast('Signed out of Google');
@@ -1371,7 +1441,7 @@ async function listFilePermissions(fileId){
 async function pullFromDrive(){
   try{
     let f=await findDriveFile();
-    if(!f)return {found:false};
+    if(!f){session.pulledThisSession=true;return {found:false}}  // no file = nothing to pull; allow push
     driveFileId=f.id;
     const cloud=await readDriveFile(f.id);
     // basic shape guard
@@ -1384,10 +1454,12 @@ async function pullFromDrive(){
       if(!state.meta.fxRate)state.meta.fxRate=DEFAULT_FX;
       lsSet('state',state);
       session.lastSync=new Date().toISOString();
+      session.pulledThisSession=true;
       updateSyncDot('synced');
       return {found:true,applied:true,cloud};
     }
     session.lastSync=new Date().toISOString();
+    session.pulledThisSession=true;
     updateSyncDot('synced');
     return {found:true,applied:false,cloud};
   }catch(e){
@@ -1420,6 +1492,24 @@ async function pushToDrive(){
     updateSyncDot('error');
     session.lastError='Empty state push blocked';
     return;
+  }
+  // SYNC HARDENING (v5.0.2): if cloud sync is on and we haven't pulled at least once this
+  // session, pull first. Prevents stale local data from overwriting fresh cloud data.
+  if(!session.pulledThisSession){
+    try{
+      const r = await pullFromDrive();
+      if(r && r.applied){
+        // Cloud was newer — applied. Re-render and DON'T push (cloud already has latest).
+        rerenderAll();
+        session.pulledThisSession = true;
+        return;
+      }
+      session.pulledThisSession = true;
+    }catch(e){
+      console.warn('pre-push pull failed, continuing with push',e);
+      // If pull fails (e.g. file not found), allow push as fallback so first-time setup works
+      session.pulledThisSession = true;
+    }
   }
   try{
     if(!driveFileId){const f=await findDriveFile();if(f)driveFileId=f.id;else{await createDriveFile(state);const f2=await findDriveFile();driveFileId=f2&&f2.id;updateSyncDot('synced');session.lastSync=new Date().toISOString();session.lastPushAt=Date.now();return}}
@@ -3060,10 +3150,10 @@ function renderTxModal(){
             <button class="ghost-btn" style="margin-top:8px;font-size:11px" onclick="txDraft.photo=null;session.ocrText='';renderTxModal()">Remove photo</button>
           ` : `
             <label class="photo-pick">
-              <input type="file" accept="image/*" capture="environment" style="display:none" onchange="onPhotoPicked(this)">
+              <input type="file" accept="image/*" style="display:none" onchange="onPhotoPicked(this)">
               <div class="photo-pick-ic">📸</div>
-              <div class="photo-pick-lab">Snap or upload receipt</div>
-              <div class="photo-pick-sub">SMS screenshot or bank statement works too</div>
+              <div class="photo-pick-lab">Upload or snap receipt</div>
+              <div class="photo-pick-sub">Choose from Photos, Files, or Camera</div>
             </label>
           `}
         </div>
