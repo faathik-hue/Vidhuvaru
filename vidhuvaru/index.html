@@ -975,7 +975,7 @@ const DATA_FILE='vidhuvaru-data.json';
 const LS='vidhuvaru:';
 const SYNC_DELAY=3000;
 const RETRY_DELAY=30000;
-const VERSION='5.0.2';
+const VERSION='5.0.3';
 /* FEATURE QUEUE (deferred until v5.0.2 is stable for 3-7 days):
    1. Budgets with warnings — set monthly limits per category (USER PRIORITY #1)
    2. Loan amortization — extra-payment calculator
@@ -1116,6 +1116,14 @@ function migrate(s){
     for(const m of s.members){
       if(m.livesIn==='vidhuvaru')m.livesIn='hiya';
       else if(m.livesIn==='island')m.livesIn='vidhuvaru';
+    }
+  }
+  // v5.0.3 fix: normalize monthlyIncome from legacy plain-number format to object format
+  // Old format: monthlyIncome: 12000  →  New format: monthlyIncome: { default: 12000 }
+  if(Array.isArray(s.members)){
+    for(const m of s.members){
+      if(typeof m.monthlyIncome==='number')m.monthlyIncome={default:m.monthlyIncome};
+      else if(!m.monthlyIncome)m.monthlyIncome={};
     }
   }
   // v4.7 → v4.8: every expense gets scope='household' by default; arrays initialized
@@ -1349,7 +1357,7 @@ async function refreshToken(){
 function signOutGoogle(){
   session.googleToken=null;session.tokenExpiry=0;session.mode='local';session.googleEmail=null;
   session.pulledThisSession=false;
-  lsDel('gtoken');lsDel('googleEmail');lsDel('lastMember');
+  lsDel('gtoken');lsDel('googleEmail');lsDel('lastMember');lsDel('driveFileId'); // FIX v5.0.3: clear cached file ID on sign-out
   stopAutoPull();
   toast('Signed out of Google');
   show('signin');
@@ -1366,27 +1374,57 @@ async function driveFetch(url,opts={}){
   return r;
 }
 async function findDriveFile(){
-  // Get all files with ownership info so we can prefer SHARED files over owned files
-  // (Critical: a family member who signs in for the first time should find the head's
-  //  shared file, not accidentally create a new orphan one in their own Drive.)
+  // FIX v5.0.3: Restore cached file ID from localStorage first.
+  // The list query returns non-deterministic results when duplicates exist, causing
+  // different devices to pick different files → sync divergence. By caching the ID,
+  // each device always reads/writes the SAME file after the first successful pull.
+  if(!driveFileId) driveFileId=lsGet('driveFileId')||null;
+  if(driveFileId){
+    try{
+      const vr=await driveFetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=id,size,modifiedTime,ownedByMe`);
+      const vf=await vr.json();
+      if(vf&&vf.id){
+        session.allDriveFiles=[vf];session.duplicateFileCount=1;session.duplicateFileIds=[];
+        _bgDuplicateCheck(driveFileId); // silent background check for leftover duplicates
+        return vf;
+      }
+    }catch(e){
+      // File gone or inaccessible — clear stale cache and fall through to list query
+      console.warn('[vidhuvaru] cached driveFileId invalid, re-scanning:',e.message);
+      driveFileId=null;lsDel('driveFileId');
+    }
+  }
+  // No valid cached ID — query Drive for all matching files
   const q=encodeURIComponent(`name='${DATA_FILE}' and trashed=false`);
   const r=await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime,createdTime,ownedByMe,owners(emailAddress,displayName),sharedWithMeTime,size)&orderBy=modifiedTime desc`);
   const j=await r.json();
   if(!j.files||!j.files.length)return null;
-  // Stash ALL candidates so the UI can show them for repair/merge
   session.allDriveFiles=j.files;
   session.duplicateFileCount=j.files.length;
-  // PREFER shared files (head's file) over our own (likely orphan).
-  // Within each group, prefer the largest (most data), then newest.
+  // Prefer shared files (head's) over owned orphans. Within group: largest then newest.
   const sharedFiles=j.files.filter(f=>!f.ownedByMe);
   const ownedFiles=j.files.filter(f=>f.ownedByMe);
-  const scoreFile=(f)=>(+(f.size||0))*1000 + (new Date(f.modifiedTime).getTime()/1e10);
+  const scoreFile=(f)=>(+(f.size||0))*1000+(new Date(f.modifiedTime).getTime()/1e10);
   sharedFiles.sort((a,b)=>scoreFile(b)-scoreFile(a));
   ownedFiles.sort((a,b)=>scoreFile(b)-scoreFile(a));
-  // If there's a shared file, that's our primary. Owned ones become "duplicates" we may want to merge/delete.
-  const ordered=sharedFiles.length>0 ? [...sharedFiles, ...ownedFiles] : [...ownedFiles];
+  const ordered=sharedFiles.length>0?[...sharedFiles,...ownedFiles]:[...ownedFiles];
   session.duplicateFileIds=ordered.slice(1).map(f=>f.id);
+  // FIX v5.0.3: Persist the chosen primary ID so all future page loads skip the list query.
+  if(ordered[0]){driveFileId=ordered[0].id;lsSet('driveFileId',driveFileId);}
   return ordered[0];
+}
+// Silent background duplicate check — runs after we've confirmed our primary file.
+// Does NOT block the pull/push flow. Populates session.duplicateFileIds for the Repair UI.
+async function _bgDuplicateCheck(knownId){
+  try{
+    const q=encodeURIComponent(`name='${DATA_FILE}' and trashed=false`);
+    const r=await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,size,modifiedTime,ownedByMe)&orderBy=modifiedTime desc`);
+    const j=await r.json();
+    if(!j.files||j.files.length<2)return;
+    session.allDriveFiles=j.files;session.duplicateFileCount=j.files.length;
+    session.duplicateFileIds=j.files.filter(f=>f.id!==knownId).map(f=>f.id);
+    if(session.duplicateFileIds.length)console.warn('[vidhuvaru] '+session.duplicateFileIds.length+' duplicate Drive file(s) detected. Open Repair Sync to consolidate.');
+  }catch(e){/* silent — don't disrupt normal flow */}
 }
 async function deleteDriveFile(id){
   return driveFetch(`https://www.googleapis.com/drive/v3/files/${id}`,{method:'DELETE'});
@@ -1442,7 +1480,7 @@ async function pullFromDrive(){
   try{
     let f=await findDriveFile();
     if(!f){session.pulledThisSession=true;return {found:false}}  // no file = nothing to pull; allow push
-    driveFileId=f.id;
+    driveFileId=f.id;lsSet('driveFileId',driveFileId); // FIX v5.0.3: persist so all devices use same file
     const cloud=await readDriveFile(f.id);
     // basic shape guard
     if(!cloud||typeof cloud!=='object')return {found:false};
@@ -1512,7 +1550,7 @@ async function pushToDrive(){
     }
   }
   try{
-    if(!driveFileId){const f=await findDriveFile();if(f)driveFileId=f.id;else{await createDriveFile(state);const f2=await findDriveFile();driveFileId=f2&&f2.id;updateSyncDot('synced');session.lastSync=new Date().toISOString();session.lastPushAt=Date.now();return}}
+    if(!driveFileId){const f=await findDriveFile();if(f){driveFileId=f.id;lsSet('driveFileId',driveFileId);}else{await createDriveFile(state);const f2=await findDriveFile();driveFileId=f2&&f2.id;if(driveFileId)lsSet('driveFileId',driveFileId);updateSyncDot('synced');session.lastSync=new Date().toISOString();session.lastPushAt=Date.now();return}}
     await patchDriveFile(driveFileId,state);
     session.lastSync=new Date().toISOString();
     session.lastPushAt=Date.now();  // suppress auto-pull races
@@ -1763,7 +1801,7 @@ async function mergeOrphanFiles(){
     primary = datas.slice().sort((a,b)=>(b.data.expenses?.length||0)-(a.data.expenses?.length||0))[0];
   }
   const merged = mergeStates(datas.map(d=>d.data), primary.data);
-  driveFileId = primary.file.id;
+  driveFileId = primary.file.id; lsSet('driveFileId',driveFileId); // FIX v5.0.3
   Object.assign(state, merged);
   saveState();
   try{
@@ -2138,6 +2176,7 @@ function totalMonthlyLoanPay(){return myLoans().filter(l=>l.status==='active').r
 function familyMonthlyIncome(mk){
   return state.members.reduce((s,m)=>{
     if(!m.monthlyIncome)return s;
+    if(typeof m.monthlyIncome==='number')return s+m.monthlyIncome; // FIX v5.0.3: legacy format
     return s+(+m.monthlyIncome[mk]||+m.monthlyIncome.default||0);
   },0);
 }
