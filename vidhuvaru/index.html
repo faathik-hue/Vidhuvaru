@@ -735,6 +735,13 @@
     box-shadow:var(--shadow-md);animation:tIn .25s;
     border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
   @keyframes tIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+  .sync-toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:50%;transform:translateX(-50%);
+    background:rgba(94,200,140,.18);color:var(--green-400);padding:7px 14px 7px 12px;border-radius:999px;
+    font-size:11.5px;font-weight:600;z-index:200;letter-spacing:.01em;
+    border:1px solid rgba(94,200,140,.32);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    animation:syncIn .3s;transition:opacity .3s}
+  .sync-toast::before{content:"↻";margin-right:6px;font-weight:700}
+  @keyframes syncIn{from{opacity:0;transform:translate(-50%,-6px)}to{opacity:1;transform:translate(-50%,0)}}
 
   /* Monthly income grid */
   .income-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
@@ -968,7 +975,7 @@ const DATA_FILE='vidhuvaru-data.json';
 const LS='vidhuvaru:';
 const SYNC_DELAY=3000;
 const RETRY_DELAY=30000;
-const VERSION='4.9';
+const VERSION='5.0';
 const DEFAULT_FX=15.42; // MVR per 1 USD (Maldivian pegged rate)
 
 // Pre-seeded family member names (used in setup screen as defaults)
@@ -1083,7 +1090,13 @@ function toast(msg){const t=document.createElement('div');t.className='toast';t.
 function lsSet(k,v){try{localStorage.setItem(LS+k,JSON.stringify(v))}catch(e){}}
 function lsGet(k){try{const v=localStorage.getItem(LS+k);return v?JSON.parse(v):null}catch(e){return null}}
 function lsDel(k){try{localStorage.removeItem(LS+k)}catch(e){}}
-function saveState(){state.meta.last_modified=new Date().toISOString();lsSet('state',state);scheduleSync()}
+function saveState(){
+  state.meta.last_modified=new Date().toISOString();
+  const me = session.currentMember;
+  if(me)state.meta.lastWriter = (me.name||'').split(' ')[0] || 'family';
+  lsSet('state',state);
+  scheduleSync();
+}
 function migrate(s){
   if(!s)return s;
   // v3 → v4: rename houses (vidhuvaru→hiya, island→vidhuvaru)
@@ -1108,11 +1121,112 @@ function migrate(s){
   if(!Array.isArray(s.familyLoans))s.familyLoans=[];
   // v4.8 → v4.9: subscriptions array
   if(!Array.isArray(s.subscriptions))s.subscriptions=[];
+  // v4.9 → v5.0: privacy model — items get createdBy + sharedWith[]
+  if(Array.isArray(s.accounts)){
+    for(const a of s.accounts){
+      // Accounts use the existing `owner` field; createdBy mirrors owner
+      if(!a.createdBy)a.createdBy = a.owner || '';
+    }
+  }
+  if(Array.isArray(s.loans)){
+    for(const l of s.loans){
+      // Loans use `borrower` as the creator
+      if(!l.createdBy)l.createdBy = l.borrower || '';
+      if(!Array.isArray(l.sharedWith))l.sharedWith = [];
+    }
+  }
+  if(Array.isArray(s.savings)){
+    for(const sv of s.savings){
+      // Savings use `by` as the creator
+      if(!sv.createdBy)sv.createdBy = sv.by || '';
+      if(!Array.isArray(sv.sharedWith))sv.sharedWith = [];
+    }
+  }
+  if(Array.isArray(s.familyLoans)){
+    for(const fl of s.familyLoans){
+      // IOUs use `lender` as the creator
+      if(!fl.createdBy)fl.createdBy = fl.lender || '';
+      if(!Array.isArray(fl.sharedWith))fl.sharedWith = [];
+    }
+  }
   s.meta=s.meta||{};
   s.meta.version=VERSION;
   return s;
 }
 function loadState(){const s=lsGet('state');if(s){migrate(s);state=Object.assign(state,s)}if(!state.meta.fxRate)state.meta.fxRate=DEFAULT_FX;if(!state.meta.version)state.meta.version=VERSION;if(!Array.isArray(state.familyLoans))state.familyLoans=[];if(!Array.isArray(state.subscriptions))state.subscriptions=[]}
+
+/* ============== PRIVACY FILTER (v5.0) ============== */
+/* Central rule: items have a `createdBy` member id, and optionally a `sharedWith[]` array.
+   visibleToMe(item) returns true if the currently logged-in member is the creator OR in sharedWith.
+   Accounts ignore sharedWith — they're ALWAYS strictly creator-only.
+   If there's no logged-in member (e.g. on the setup screen), nothing is filtered (return true). */
+function currentMemberId(){return session.currentMember?.id || null}
+function visibleToMe(item, opts){
+  if(!item)return false;
+  const me = currentMemberId();
+  if(!me)return true; // pre-login views (setup, debug) show everything
+  if(item.createdBy && item.createdBy === me)return true;
+  if(opts && opts.strict)return false; // accounts: only creator
+  if(Array.isArray(item.sharedWith) && item.sharedWith.includes(me))return true;
+  return false;
+}
+function myAccounts(){
+  // Accounts are STRICTLY personal — no share option
+  return (state.accounts||[]).filter(a=>visibleToMe(a,{strict:true}));
+}
+function myLoans(){return (state.loans||[]).filter(visibleToMe)}
+function mySavings(){return (state.savings||[]).filter(visibleToMe)}
+function myFamilyLoans(){return (state.familyLoans||[]).filter(visibleToMe)}
+function mySubscriptions(){
+  // Subscriptions: household ones visible to everyone in that household; personal ones private
+  const me = currentMemberId();
+  return (state.subscriptions||[]).filter(sub=>{
+    if(sub.scope==='household')return true;
+    return !me || sub.paidBy===me;
+  });
+}
+
+/* Renders a "Visible to" section inside a modal. draftName is the global var name
+   ('loanDraft', 'savDraft', 'famLoanDraft'). item is the draft. creator is the member who owns it. */
+function renderShareSection(draftName, item, creator){
+  const creatorId = item.createdBy || creator?.id;
+  const others = state.members.filter(m=>m.id!==creatorId);
+  const sharedSet = new Set(item.sharedWith||[]);
+  const sharedCount = sharedSet.size;
+  return `
+    <div style="margin:14px 0;padding:14px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:14px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--fg);letter-spacing:-.01em">🔒 Visible to</div>
+        <div style="font-size:10px;color:var(--fg-3);font-family:var(--font-mono)">${sharedCount===0?'Just you':`You + ${sharedCount} other${sharedCount>1?'s':''}`}</div>
+      </div>
+      <div style="font-size:11px;color:var(--fg-3);line-height:1.5;margin-bottom:10px">
+        Private to ${creator?escapeHTML(creator.name.split(' ')[0]):'you'} by default. Tap a family member below to also share with them.
+      </div>
+      ${others.length===0 ? '<div style="font-size:11px;color:var(--fg-3)">No other members to share with.</div>' :
+        `<div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${others.map(m=>{
+            const on = sharedSet.has(m.id);
+            return `<button onclick="toggleShareMember('${draftName}','${m.id}')" style="display:flex;align-items:center;gap:6px;padding:7px 11px;border-radius:999px;border:1px solid ${on?'rgba(94,200,140,.5)':'rgba(255,255,255,.08)'};background:${on?'rgba(94,200,140,.12)':'rgba(255,255,255,.03)'};color:${on?'var(--green-400)':'var(--fg-2)'};font-size:11.5px;font-weight:600;cursor:pointer">
+              ${on?'✓':'+'} ${escapeHTML(m.name.split(' ')[0])}
+            </button>`;
+          }).join('')}
+        </div>`
+      }
+    </div>
+  `;
+}
+function toggleShareMember(draftName, memberId){
+  const draft = window[draftName] || globalThis[draftName];
+  if(!draft)return;
+  if(!Array.isArray(draft.sharedWith))draft.sharedWith=[];
+  const idx = draft.sharedWith.indexOf(memberId);
+  if(idx>=0)draft.sharedWith.splice(idx,1);
+  else draft.sharedWith.push(memberId);
+  // Re-render the appropriate modal
+  if(draftName==='loanDraft' && typeof renderLoanModal==='function')renderLoanModal();
+  else if(draftName==='savDraft' && typeof renderSavModal==='function')renderSavModal();
+  else if(draftName==='famLoanDraft' && typeof renderFamilyLoanModal==='function')renderFamilyLoanModal();
+}
 
 /* ============== GOOGLE AUTH ============== */
 let tokenClient=null;
@@ -1156,6 +1270,7 @@ async function refreshToken(){
 function signOutGoogle(){
   session.googleToken=null;session.tokenExpiry=0;session.mode='local';session.googleEmail=null;
   lsDel('gtoken');lsDel('googleEmail');lsDel('lastMember');
+  stopAutoPull();
   toast('Signed out of Google');
   show('signin');
 }
@@ -1282,10 +1397,25 @@ function scheduleSync(){
 }
 async function pushToDrive(){
   if(session.mode!=='cloud')return;
+  // CRITICAL: Never push an empty state if we have a Drive file with data.
+  // This prevents the bug where signing in with no local data overwrites the shared file.
+  // Allow push if: user has acted (made an edit), OR we have substantive data.
+  const hasData = (state.members||[]).length>0
+    || (state.expenses||[]).length>0
+    || (state.accounts||[]).length>0
+    || (state.savings||[]).length>0
+    || (state.loans||[]).length>0;
+  if(!hasData && driveFileId){
+    console.warn('Refusing to push empty state — Drive file exists');
+    updateSyncDot('error');
+    session.lastError='Empty state push blocked';
+    return;
+  }
   try{
-    if(!driveFileId){const f=await findDriveFile();if(f)driveFileId=f.id;else{await createDriveFile(state);const f2=await findDriveFile();driveFileId=f2&&f2.id;updateSyncDot('synced');session.lastSync=new Date().toISOString();return}}
+    if(!driveFileId){const f=await findDriveFile();if(f)driveFileId=f.id;else{await createDriveFile(state);const f2=await findDriveFile();driveFileId=f2&&f2.id;updateSyncDot('synced');session.lastSync=new Date().toISOString();session.lastPushAt=Date.now();return}}
     await patchDriveFile(driveFileId,state);
     session.lastSync=new Date().toISOString();
+    session.lastPushAt=Date.now();  // suppress auto-pull races
     session.lastError=null;
     updateSyncDot('synced');
     if(retryTimer){clearTimeout(retryTimer);retryTimer=null}
@@ -1296,6 +1426,38 @@ async function pushToDrive(){
     if(retryTimer)clearTimeout(retryTimer);
     retryTimer=setTimeout(pushToDrive,RETRY_DELAY);
   }
+}
+
+/* ============== AUTO-SYNC (v5.0) ============== */
+/* Every 2 minutes, quietly pull from Drive. If cloud is newer, apply + show toast. */
+const AUTO_PULL_MS = 120000;     // 2 minutes
+let autoPullTimer = null;
+function startAutoPull(){
+  if(autoPullTimer)clearInterval(autoPullTimer);
+  autoPullTimer = setInterval(async ()=>{
+    if(session.mode!=='cloud')return;
+    if(!document || document.hidden)return; // skip when tab hidden
+    // Skip if we just pushed (5 sec window — avoid race)
+    if(session.lastPushAt && Date.now()-session.lastPushAt < 5000)return;
+    try{
+      const before = JSON.stringify({m:state.members.length,e:state.expenses.length});
+      const r = await pullFromDrive();
+      if(r.applied){
+        rerenderAll();
+        // figure out who added what (very rough)
+        const lastWriter = state.meta?.lastWriter || 'family';
+        showSyncToast(`New from ${lastWriter}`);
+      }
+    }catch(e){console.error('auto-pull failed',e)}
+  }, AUTO_PULL_MS);
+}
+function stopAutoPull(){if(autoPullTimer){clearInterval(autoPullTimer);autoPullTimer=null}}
+function showSyncToast(msg){
+  const t=document.createElement('div');
+  t.className='sync-toast';
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300)},2500);
 }
 function updateSyncDot(s){
   session.syncStatus=s;
@@ -1482,30 +1644,36 @@ async function mergeOrphanFiles(){
   show('loading');
   $('loadingStatus').textContent='Reading all files…';
   const datas = [];
+  // Wrap each file read in a 30-second timeout to avoid hanging forever (Fazeel's bug)
+  const withTimeout = (promise, ms, label) => Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout '+label)), ms))
+  ]);
   for(const f of files){
     try{
-      const d = await readDriveFile(f.id);
+      $('loadingStatus').textContent='Reading '+(f.name||'file')+'…';
+      const d = await withTimeout(readDriveFile(f.id), 30000, f.id);
       if(d && typeof d==='object'){datas.push({file:f,data:migrate(d)})}
-    }catch(e){console.error('Failed to read',f.id,e)}
+    }catch(e){console.error('Failed/timeout reading',f.id,e)}
   }
   if(!datas.length){toast('Couldn\'t read any file');show('repair');return}
   $('loadingStatus').textContent='Merging…';
-  // Pick primary: prefer shared file, else file with most data
   let primary = datas.find(d=>!d.file.ownedByMe);
   if(!primary){
     primary = datas.slice().sort((a,b)=>(b.data.expenses?.length||0)-(a.data.expenses?.length||0))[0];
   }
   const merged = mergeStates(datas.map(d=>d.data), primary.data);
-  // Save merged data into primary file
   driveFileId = primary.file.id;
   Object.assign(state, merged);
   saveState();
   try{
-    await patchDriveFile(primary.file.id, state);
-    // delete others
+    $('loadingStatus').textContent='Saving merged data…';
+    await withTimeout(patchDriveFile(primary.file.id, state), 30000, 'merge-save');
+    // Delete other files (best-effort, don't block on each)
     for(const d of datas){
       if(d.file.id===primary.file.id)continue;
-      try{await deleteDriveFile(d.file.id)}catch(e){console.error('Delete failed',e)}
+      try{await withTimeout(deleteDriveFile(d.file.id), 15000, 'delete-'+d.file.id)}
+      catch(e){console.error('Delete failed/timeout',e)}
     }
     session.lastSync = new Date().toISOString();
     updateSyncDot('synced');
@@ -1513,7 +1681,7 @@ async function mergeOrphanFiles(){
     afterDataReady();
   }catch(e){
     console.error(e);
-    toast('Merge save failed');
+    toast('Merge save failed — ' + (e.message==='timeout merge-save' ? 'try again' : e.message));
     show('repair');
   }
 }
@@ -1756,6 +1924,8 @@ function enterMain(){
   go('dashboard');
   // background pull on open if cloud
   if(session.mode==='cloud'){setTimeout(()=>pullFromDrive().then(r=>{if(r.applied)rerenderAll()}),800)}
+  // Start auto-pull every 2 minutes
+  startAutoPull();
   // One-time Share-with-family prompt for Head when family isn't shared yet
   setTimeout(maybePromptShare, 1400);
 }
@@ -1862,9 +2032,9 @@ function monthExpenses(mk, scope){
   });
 }
 function monthIncome(mk){return state.expenses.filter(e=>e.date&&e.date.slice(0,7)===mk && e.type==='income')}
-function totalSavings(){return state.savings.reduce((s,r)=>s+(r.type==='deposit'?+r.amount:-(+r.amount)),0)}
-function totalLoans(){return state.loans.filter(l=>l.status!=='paidoff'&&l.status!=='defaulted').reduce((s,l)=>s+(+l.balance||0),0)}
-function totalMonthlyLoanPay(){return state.loans.filter(l=>l.status==='active').reduce((s,l)=>s+(+l.monthlyPayment||0),0)}
+function totalSavings(){return mySavings().reduce((s,r)=>s+(r.type==='deposit'?+r.amount:-(+r.amount)),0)}
+function totalLoans(){return myLoans().filter(l=>l.status!=='paidoff'&&l.status!=='defaulted').reduce((s,l)=>s+(+l.balance||0),0)}
+function totalMonthlyLoanPay(){return myLoans().filter(l=>l.status==='active').reduce((s,l)=>s+(+l.monthlyPayment||0),0)}
 function familyMonthlyIncome(mk){
   return state.members.reduce((s,m)=>{
     if(!m.monthlyIncome)return s;
@@ -1872,7 +2042,7 @@ function familyMonthlyIncome(mk){
   },0);
 }
 function accountBalanceMVR(){
-  return state.accounts.reduce((s,a)=>s+toMVR(a.balance,a.currency),0);
+  return myAccounts().reduce((s,a)=>s+toMVR(a.balance,a.currency),0);
 }
 function netPosition(){
   // Family net position in MVR
@@ -1964,7 +2134,7 @@ function buildMicroBars(exps){
 // Inter-family lending: who owes whom (positive = they owe you)
 function familyLendingBalance(memberId){
   let net=0;
-  for(const l of (state.familyLoans||[])){
+  for(const l of myFamilyLoans()){
     const amt=+l.amount||0, paid=+l.paid||0, remain=amt-paid;
     if(l.lender===memberId) net+=remain;
     if(l.borrower===memberId) net-=remain;
@@ -2006,16 +2176,19 @@ function renderDashboard(){
   // recent transactions (household scope + my own personal)
   const recent=[...state.expenses].filter(e=>e.scope!=='personal' || e.paidBy===meId).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.id||'').localeCompare(a.id||'')).slice(0,5);
 
-  // accounts strip
-  const accs=state.accounts.slice(0,10);
-  const usdTotal=state.accounts.filter(a=>a.currency==='USD').reduce((s,a)=>s+(+a.balance||0),0);
+  // accounts strip — only show MY accounts
+  const myAccs = myAccounts();
+  const accs=myAccs.slice(0,10);
+  const usdTotal=myAccs.filter(a=>a.currency==='USD').reduce((s,a)=>s+(+a.balance||0),0);
 
   // per-member breakdown for the household this month: their SHARE of household bills
+  // Loans column shows only loans visible to me (mine + shared with me)
+  const visLoans = myLoans();
   const memberRows=state.members.map(m=>{
     const inc=(+m.monthlyIncome?.[mk]||+m.monthlyIncome?.default||0);
     const share=memberHouseShare(m.id,mk);
     const paid=memberHousePaid(m.id,mk);
-    const loans=state.loans.filter(l=>l.borrower===m.id&&l.status==='active').reduce((s,l)=>s+(+l.monthlyPayment||0),0);
+    const loans=visLoans.filter(l=>l.borrower===m.id&&l.status==='active').reduce((s,l)=>s+(+l.monthlyPayment||0),0);
     return {m,inc,share,paid,loans,net:paid-share};
   });
 
@@ -2532,7 +2705,7 @@ function renderMore(){
       const totalAcc=accountBalanceMVR();
       const totalLoanBal=totalLoans();
       const totalMonLoan=totalMonthlyLoanPay();
-      const activeLoans=state.loans.filter(l=>l.status==='active').length;
+      const activeLoans=myLoans().filter(l=>l.status==='active').length;
       const netAbs=Math.abs(famNet);
       const netWhole=Math.floor(netAbs).toLocaleString('en-US');
       const netCents=(netAbs - Math.floor(netAbs)).toFixed(2).slice(1);
@@ -2606,7 +2779,7 @@ function renderMore(){
 
     <div class="stats-card">
       <div class="stats-card-hd"><h3>Family lending</h3><span class="more" onclick="openFamilyLoan()" style="font-size:11px;color:var(--p-gold,var(--gold));cursor:pointer;font-weight:600">+ NEW IOU</span></div>
-      ${(state.familyLoans||[]).length===0?`<div class="empty" style="padding:14px 0">No IOUs recorded</div>`:`
+      ${myFamilyLoans().length===0?`<div class="empty" style="padding:14px 0">No IOUs recorded</div>`:`
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
           <div style="padding:10px;background:rgba(94,200,140,.06);border:1px solid rgba(94,200,140,.18);border-radius:12px">
             <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--green-400);font-weight:700">You're owed</div>
@@ -2617,7 +2790,7 @@ function renderMore(){
             <div style="font-family:var(--font-serif);font-size:18px;font-weight:600;color:var(--red-400);margin-top:3px;font-variant-numeric:tabular-nums">${myLendBal<0?fmtNum(Math.abs(myLendBal)):'0.00'}</div>
           </div>
         </div>
-        ${(state.familyLoans||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,8).map(l=>{
+        ${myFamilyLoans().slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,8).map(l=>{
           const lender=mem(l.lender), borrower=mem(l.borrower);
           const remain=(+l.amount||0)-(+l.paid||0);
           const isMine=l.lender===m.id||l.borrower===m.id;
@@ -2625,7 +2798,7 @@ function renderMore(){
           return `<div class="list-row" onclick="openFamilyLoan('${l.id}')">
             <div class="list-ic" style="background:${remain<=0?'rgba(94,200,140,.18)':'rgba(212,165,116,.14)'};color:${remain<=0?'var(--green-400)':'var(--p-gold)'}">${remain<=0?'✓':'⇄'}</div>
             <div class="list-body">
-              <div class="list-pri">${lender?escapeHTML(lender.name.split(' ')[0]):'?'} → ${borrower?escapeHTML(borrower.name.split(' ')[0]):'?'}${isMine?' <small style="color:var(--p-gold);font-weight:700">YOU</small>':''}</div>
+              <div class="list-pri">${lender?escapeHTML(lender.name.split(' ')[0]):'?'} → ${borrower?escapeHTML(borrower.name.split(' ')[0]):'?'}${isMine?' <small style="color:var(--p-gold);font-weight:700">YOU</small>':''}${(l.sharedWith&&l.sharedWith.length)?' <small style="color:var(--fg-3)">🔓</small>':''}</div>
               <div class="list-sec">${escapeHTML(l.purpose||'Loan')} · ${dateRel(l.date)} · ${remain>0?fmtMVR(remain)+' left':'Settled'}</div>
             </div>
             <div class="list-rt ${cls}">${fmtNum(l.amount)}</div>
@@ -2668,16 +2841,16 @@ function renderMore(){
 
     <div class="stats-card">
       <div class="stats-card-hd"><h3>Savings · ${fmtMVR(totalSavings())}</h3><span class="more" onclick="openSavings()" style="font-size:11px;color:var(--p-gold,var(--gold));cursor:pointer;font-weight:600">+ ADD</span></div>
-      ${state.savings.slice(-5).reverse().map(s=>{const by=mem(s.by);return `<div class="list-row" onclick="openSavings('${s.id}')">
+      ${mySavings().slice(-5).reverse().map(s=>{const by=mem(s.by);return `<div class="list-row" onclick="openSavings('${s.id}')">
         <div class="list-ic">${s.type==='deposit'?'⬆️':'⬇️'}</div>
-        <div class="list-body"><div class="list-pri">${escapeHTML(s.purpose||(s.type==='deposit'?'Deposit':'Withdrawal'))}</div><div class="list-sec">${dateRel(s.date)} · ${by?escapeHTML(by.name):'—'}</div></div>
+        <div class="list-body"><div class="list-pri">${escapeHTML(s.purpose||(s.type==='deposit'?'Deposit':'Withdrawal'))}</div><div class="list-sec">${dateRel(s.date)} · ${by?escapeHTML(by.name):'—'}${(s.sharedWith&&s.sharedWith.length)?' · 🔓 shared':''}</div></div>
         <div class="list-rt ${s.type==='deposit'?'gn':'rd'}">${s.type==='deposit'?'+':'−'}${fmtMVR(s.amount)}</div>
       </div>`}).join('') || '<div class="empty" style="padding:14px 0">No savings entries yet</div>'}
     </div>
 
     <div class="stats-card">
       <div class="stats-card-hd"><h3>Loans · ${fmtMVR(totalLoans())} outstanding</h3><span class="more" onclick="openLoan()" style="font-size:11px;color:var(--p-gold,var(--gold));cursor:pointer;font-weight:600">+ ADD</span></div>
-      ${state.loans.length===0?`<div class="empty" style="padding:14px 0">No loans tracked</div>`:state.loans.map(l=>{
+      ${myLoans().length===0?`<div class="empty" style="padding:14px 0">No loans tracked</div>`:myLoans().map(l=>{
         const b=mem(l.borrower);const orig=+l.originalAmount||0;const bal=+l.balance||0;const paid=orig>0?Math.max(0,Math.min(100,((orig-bal)/orig)*100)):0;
         return `<div class="list-row" onclick="openLoan('${l.id}')" style="flex-direction:column;align-items:stretch;gap:6px">
           <div style="display:flex;justify-content:space-between;align-items:baseline;width:100%">
@@ -2685,14 +2858,14 @@ function renderMore(){
             <div style="font-family:var(--font-mono);font-weight:600;color:var(--red-400);font-variant-numeric:tabular-nums">${fmtMVR(bal)}</div>
           </div>
           <div style="height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;width:100%"><div style="height:100%;background:var(--green-400);width:${paid}%"></div></div>
-          <div style="font-size:11px;color:var(--fg-3);font-family:var(--font-mono)">${b?escapeHTML(b.name):'—'} · ${fmtMVR(l.monthlyPayment||0)}/mo · ${Math.round(paid)}% paid</div>
+          <div style="font-size:11px;color:var(--fg-3);font-family:var(--font-mono)">${b?escapeHTML(b.name):'—'} · ${fmtMVR(l.monthlyPayment||0)}/mo · ${Math.round(paid)}% paid${(l.sharedWith&&l.sharedWith.length)?' · 🔓 shared':''}</div>
         </div>`}).join('')}
     </div>
 
     <div class="stats-card">
       <div class="stats-card-hd"><h3>Accounts</h3><span class="more" onclick="openAccount()" style="font-size:11px;color:var(--p-gold,var(--gold));cursor:pointer;font-weight:600">+ ADD</span></div>
       <div class="acc-scroll" style="margin:0 -16px;padding:4px 16px 4px">
-        ${state.accounts.map(a=>{const o=mem(a.owner);return `<div class="acc-card ${a.currency==='USD'?'usd':''}" onclick="openAccount('${a.id}')">
+        ${myAccounts().map(a=>{const o=mem(a.owner);return `<div class="acc-card ${a.currency==='USD'?'usd':''}" onclick="openAccount('${a.id}')">
           <div class="bank">${escapeHTML(a.bank)} ${escapeHTML(a.type)}</div>
           <div class="ccy">${a.currency}</div>
           <div class="nm">${escapeHTML(a.name)}</div>
@@ -2969,7 +3142,7 @@ function renderTxModal(){
 
     <div class="field"><label>Description</label><input value="${escapeHTML(t.description)}" oninput="txDraft.description=this.value" placeholder="What was it for?"></div>
 
-    <div class="field"><label>Account (optional)</label><select onchange="txDraft.account=this.value"><option value="">— None —</option>${state.accounts.filter(a=>!isHousehold?a.owner===t.paidBy:true).map(a=>`<option value="${a.id}" ${a.id===t.account?'selected':''}>${escapeHTML(a.name)} (${a.currency})</option>`).join('')}</select></div>
+    <div class="field"><label>Account (optional)</label><select onchange="txDraft.account=this.value"><option value="">— None —</option>${myAccounts().filter(a=>!isHousehold?a.owner===t.paidBy:true).map(a=>`<option value="${a.id}" ${a.id===t.account?'selected':''}>${escapeHTML(a.name)} (${a.currency})</option>`).join('')}</select></div>
 
     <div class="field"><label>Note (optional)</label><textarea oninput="txDraft.note=this.value">${escapeHTML(t.note||'')}</textarea></div>
 
@@ -3119,7 +3292,7 @@ function parseBmlSms(t){
   out.note = (out.ref?`BML · Ref:${out.ref}`:'BML SMS');
   // Account match
   if(out.accountLast4){
-    const m = state.accounts.find(a=>a.number && a.number.replace(/\D/g,'').endsWith(out.accountLast4));
+    const m = myAccounts().find(a=>a.number && a.number.replace(/\D/g,'').endsWith(out.accountLast4));
     if(m){out.account=m.id;out.currency=m.currency||out.currency}
   }
   return out;
@@ -3145,7 +3318,7 @@ function parseMibSms(t){
     out.category = categorizeFromMerchant(out.merchant||'', t);
     out.note = `MIB · ${out.txType}`;
     if(out.accountLast4){
-      const a = state.accounts.find(a=>a.number && a.number.replace(/\D/g,'').endsWith(out.accountLast4));
+      const a = myAccounts().find(a=>a.number && a.number.replace(/\D/g,'').endsWith(out.accountLast4));
       if(a){out.account=a.id;out.currency=a.currency||out.currency}
     }
     return out;
@@ -3164,7 +3337,7 @@ function parseMibSms(t){
     // try to match account by last digits
     const last4 = (m[2].replace(/\D/g,'').slice(-4));
     if(last4){
-      const a = state.accounts.find(a=>a.number && a.number.replace(/\D/g,'').endsWith(last4));
+      const a = myAccounts().find(a=>a.number && a.number.replace(/\D/g,'').endsWith(last4));
       if(a){out.account=a.id;out.currency=a.currency||out.currency}
     }
     return out;
@@ -3351,13 +3524,20 @@ function deleteTx(){
 let accDraft=null;
 function openAccount(id){
   if(id){const a=acc(id);if(!a)return;accDraft={...a}}
-  else accDraft={id:null,name:'',bank:'BML',type:'Current',currency:'MVR',balance:0,owner:session.currentMember?.id||state.members[0]?.id,number:''};
+  else{
+    const meId = session.currentMember?.id || state.members[0]?.id;
+    accDraft={id:null,name:'',bank:'BML',type:'Current',currency:'MVR',balance:0,owner:meId,createdBy:meId,number:''};
+  }
   renderAccModal();
 }
 function renderAccModal(){
   const a=accDraft;
+  const me = session.currentMember || state.members.find(m=>m.id===a.owner) || state.members[0];
   openModal(`
     <div class="modal-hd"><h3>${a.id?'Edit':'Add'} account</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div style="background:rgba(212,165,116,.06);border:1px solid rgba(212,165,116,.18);border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--fg-2);line-height:1.5">
+      🔒 This account is <strong style="color:var(--p-gold,var(--gold))">private to ${me?escapeHTML(me.name.split(' ')[0]):'you'}</strong>. Other family members won't see it.
+    </div>
     <div class="field"><label>Account name</label><input value="${escapeHTML(a.name)}" oninput="accDraft.name=this.value" placeholder="e.g. BML Main, USD Savings"></div>
     <div class="grid-2">
       <div class="field"><label>Bank</label><select onchange="accDraft.bank=this.value">${BANKS.map(b=>`<option ${b===a.bank?'selected':''}>${b}</option>`).join('')}</select></div>
@@ -3367,10 +3547,7 @@ function renderAccModal(){
       <div class="field"><label>Currency</label><select onchange="accDraft.currency=this.value">${CURRENCIES.map(c=>`<option value="${c.code}" ${c.code===a.currency?'selected':''}>${c.symbol} ${c.code}</option>`).join('')}</select></div>
       <div class="field"><label>Balance</label><input type="number" step="0.01" value="${a.balance}" oninput="accDraft.balance=+this.value||0"></div>
     </div>
-    <div class="grid-2">
-      <div class="field"><label>Owner</label><select onchange="accDraft.owner=this.value">${state.members.map(m=>`<option value="${m.id}" ${m.id===a.owner?'selected':''}>${escapeHTML(m.name)}</option>`).join('')}</select></div>
-      <div class="field"><label>Last 4 digits</label><input value="${escapeHTML(a.number||'')}" oninput="accDraft.number=this.value.slice(0,6)" placeholder="XX1234"></div>
-    </div>
+    <div class="field"><label>Last 4 digits (for BML/MIB SMS matching)</label><input value="${escapeHTML(a.number||'')}" oninput="accDraft.number=this.value.slice(0,6)" placeholder="XX1234"></div>
     <div class="modal-actions">
       ${a.id?`<button class="danger-btn" style="margin:0" onclick="deleteAcc()">Delete</button>`:''}
       <button class="secondary-btn" onclick="closeModal()">Cancel</button>
@@ -3380,6 +3557,10 @@ function renderAccModal(){
 }
 function saveAcc(){
   if(!accDraft.name.trim()){toast('Name required');return}
+  // Ensure createdBy + owner are always the current member (privacy guarantee)
+  const meId = session.currentMember?.id || accDraft.createdBy || accDraft.owner || state.members[0]?.id;
+  accDraft.createdBy = accDraft.createdBy || meId;
+  accDraft.owner = accDraft.owner || meId;
   if(accDraft.id){const i=state.accounts.findIndex(x=>x.id===accDraft.id);state.accounts[i]={...accDraft}}
   else state.accounts.push({...accDraft,id:uid('a')});
   saveState();closeModal();rerenderAll();toast(accDraft.id?'Saved':'Added');
@@ -3389,12 +3570,16 @@ function deleteAcc(){const i=state.accounts.findIndex(x=>x.id===accDraft.id);if(
 /* ============== LOAN MODAL ============== */
 let loanDraft=null;
 function openLoan(id){
-  if(id){const l=state.loans.find(x=>x.id===id);if(!l)return;loanDraft={...l}}
-  else loanDraft={id:null,lender:'BML',borrower:session.currentMember?.id||state.members[0]?.id,purpose:'',originalAmount:0,balance:0,monthlyPayment:0,interestRate:0,startDate:todayISO(),endDate:'',status:'active'};
+  if(id){const l=state.loans.find(x=>x.id===id);if(!l)return;loanDraft={...l, sharedWith:Array.isArray(l.sharedWith)?[...l.sharedWith]:[]};}
+  else{
+    const meId = session.currentMember?.id || state.members[0]?.id;
+    loanDraft={id:null,lender:'BML',borrower:meId,purpose:'',originalAmount:0,balance:0,monthlyPayment:0,interestRate:0,startDate:todayISO(),endDate:'',status:'active',createdBy:meId,sharedWith:[]};
+  }
   renderLoanModal();
 }
 function renderLoanModal(){
   const l=loanDraft;
+  const creator = mem(l.createdBy) || session.currentMember;
   openModal(`
     <div class="modal-hd"><h3>${l.id?'Edit':'Add'} loan</h3><span class="modal-close" onclick="closeModal()">×</span></div>
     <div class="grid-2">
@@ -3415,6 +3600,7 @@ function renderLoanModal(){
       <div class="field"><label>End (est)</label><input type="date" value="${l.endDate||''}" oninput="loanDraft.endDate=this.value"></div>
     </div>
     <div class="field"><label>Status</label><select onchange="loanDraft.status=this.value">${['active','paidoff','onhold','defaulted'].map(s=>`<option value="${s}" ${s===l.status?'selected':''}>${s}</option>`).join('')}</select></div>
+    ${renderShareSection('loanDraft', l, creator)}
     <div class="modal-actions">
       ${l.id?`<button class="danger-btn" style="margin:0" onclick="deleteLoan()">Delete</button>`:''}
       <button class="secondary-btn" onclick="closeModal()">Cancel</button>
@@ -3424,6 +3610,9 @@ function renderLoanModal(){
 }
 function saveLoan(){
   if(!loanDraft.lender.trim()){toast('Lender required');return}
+  const meId = session.currentMember?.id || loanDraft.createdBy || state.members[0]?.id;
+  if(!loanDraft.createdBy)loanDraft.createdBy = meId;
+  if(!Array.isArray(loanDraft.sharedWith))loanDraft.sharedWith = [];
   if(loanDraft.id){const i=state.loans.findIndex(x=>x.id===loanDraft.id);state.loans[i]={...loanDraft}}
   else state.loans.push({...loanDraft,id:uid('l')});
   saveState();closeModal();rerenderAll();toast('Saved');
@@ -3433,12 +3622,16 @@ function deleteLoan(){const i=state.loans.findIndex(x=>x.id===loanDraft.id);if(i
 /* ============== SAVINGS MODAL ============== */
 let savDraft=null;
 function openSavings(id){
-  if(id){const s=state.savings.find(x=>x.id===id);if(!s)return;savDraft={...s}}
-  else savDraft={id:null,date:todayISO(),type:'deposit',amount:0,purpose:'',by:session.currentMember?.id||state.members[0]?.id,note:''};
+  if(id){const s=state.savings.find(x=>x.id===id);if(!s)return;savDraft={...s, sharedWith:Array.isArray(s.sharedWith)?[...s.sharedWith]:[]};}
+  else{
+    const meId = session.currentMember?.id || state.members[0]?.id;
+    savDraft={id:null,date:todayISO(),type:'deposit',amount:0,purpose:'',by:meId,createdBy:meId,sharedWith:[],note:''};
+  }
   renderSavModal();
 }
 function renderSavModal(){
   const s=savDraft;
+  const creator = mem(s.createdBy) || session.currentMember;
   openModal(`
     <div class="modal-hd"><h3>${s.id?'Edit':'Add'} savings</h3><span class="modal-close" onclick="closeModal()">×</span></div>
     <div class="seg" style="grid-template-columns:1fr 1fr">
@@ -3453,6 +3646,7 @@ function renderSavModal(){
       <div class="field"><label>By</label><select onchange="savDraft.by=this.value">${state.members.map(m=>`<option value="${m.id}" ${m.id===s.by?'selected':''}>${escapeHTML(m.name)}</option>`).join('')}</select></div>
     </div>
     <div class="field"><label>Purpose</label><input value="${escapeHTML(s.purpose||'')}" oninput="savDraft.purpose=this.value" placeholder="Emergency, Hajj, House repair..."></div>
+    ${renderShareSection('savDraft', s, creator)}
     <div class="modal-actions">
       ${s.id?`<button class="danger-btn" style="margin:0" onclick="deleteSav()">Delete</button>`:''}
       <button class="secondary-btn" onclick="closeModal()">Cancel</button>
@@ -3462,6 +3656,9 @@ function renderSavModal(){
 }
 function saveSav(){
   if(!savDraft.amount||savDraft.amount<=0){toast('Enter amount');return}
+  const meId = session.currentMember?.id || savDraft.createdBy || state.members[0]?.id;
+  if(!savDraft.createdBy)savDraft.createdBy = meId;
+  if(!Array.isArray(savDraft.sharedWith))savDraft.sharedWith = [];
   if(savDraft.id){const i=state.savings.findIndex(x=>x.id===savDraft.id);state.savings[i]={...savDraft}}
   else state.savings.push({...savDraft,id:uid('s')});
   saveState();closeModal();rerenderAll();toast('Saved');
@@ -3821,17 +4018,18 @@ function openFamilyLoan(id){
   if(id){
     const l=(state.familyLoans||[]).find(x=>x.id===id);
     if(!l)return;
-    famLoanDraft={...l};
+    famLoanDraft={...l, sharedWith:Array.isArray(l.sharedWith)?[...l.sharedWith]:[]};
   } else {
     const meId=session.currentMember?.id;
     const other=state.members.find(m=>m.id!==meId);
-    famLoanDraft={id:null,date:todayISO(),lender:meId,borrower:other?.id||state.members[0]?.id,amount:0,paid:0,purpose:'',note:''};
+    famLoanDraft={id:null,date:todayISO(),lender:meId,borrower:other?.id||state.members[0]?.id,amount:0,paid:0,purpose:'',note:'',createdBy:meId,sharedWith:[]};
   }
   renderFamilyLoanModal();
 }
 function renderFamilyLoanModal(){
   const l=famLoanDraft;
   const remain=Math.max(0,(+l.amount||0)-(+l.paid||0));
+  const creator = mem(l.createdBy) || session.currentMember;
   openModal(`
     <div class="modal-hd"><h3>${l.id?'Edit IOU':'New IOU'}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
     <div style="background:rgba(212,165,116,.06);border:1px solid rgba(212,165,116,.2);border-radius:14px;padding:12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
@@ -3862,6 +4060,7 @@ function renderFamilyLoanModal(){
     </div>
     <div class="field"><label>Purpose</label><input value="${escapeHTML(l.purpose||'')}" oninput="famLoanDraft.purpose=this.value" placeholder="Phone bill, fuel, emergency..."></div>
     <div class="field"><label>Note (optional)</label><textarea oninput="famLoanDraft.note=this.value">${escapeHTML(l.note||'')}</textarea></div>
+    ${renderShareSection('famLoanDraft', l, creator)}
     ${remain>0?`<button class="secondary-btn" onclick="settleFamilyLoan()" style="margin-bottom:8px">Mark fully paid</button>`:''}
     <div class="modal-actions">
       ${l.id?`<button class="danger-btn" style="margin:0" onclick="deleteFamilyLoan()">Delete</button>`:''}
@@ -3876,6 +4075,9 @@ function saveFamilyLoan(){
   if(!l.amount||+l.amount<=0){toast('Enter amount');return}
   if(!l.lender||!l.borrower||l.lender===l.borrower){toast('Pick different lender and borrower');return}
   state.familyLoans=state.familyLoans||[];
+  const meId = session.currentMember?.id || l.createdBy || l.lender;
+  if(!l.createdBy)l.createdBy = meId;
+  if(!Array.isArray(l.sharedWith))l.sharedWith = [];
   const remain=(+l.amount||0)-(+l.paid||0);
   l.status = remain<=0 ? 'paid' : 'active';
   if(l.id){const i=state.familyLoans.findIndex(x=>x.id===l.id);state.familyLoans[i]={...l}}
