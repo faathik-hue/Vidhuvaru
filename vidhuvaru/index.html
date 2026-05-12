@@ -767,11 +767,14 @@
   <!-- SETUP SCREEN (only shown for genuine first-time setup) -->
   <div id="setup" class="screen">
     <div class="setup-head">
-      <h2>Welcome to Vidhuvaru</h2>
-      <p>Set up your family — you can add up to 8 members.</p>
+      <h2>Your family</h2>
+      <p>I've pre-filled the names. Adjust roles if needed, then tap <em style="color:var(--p-gold,var(--gold));font-style:italic">Start using Vidhuvaru</em>. Each member sets their own PIN on first login.</p>
+      <div style="background:rgba(212,165,116,.06);border:1px solid rgba(212,165,116,.22);border-radius:12px;padding:10px 12px;margin-top:14px;font-size:11px;color:var(--fg-2);line-height:1.5">
+        <strong style="color:var(--p-gold,var(--gold))">Joining the family?</strong> If you're not Faathik setting up for the first time, close this and ask him to <em style="font-style:italic">Share with family</em> from his More tab first. Otherwise you'll create a separate empty copy.
+      </div>
     </div>
     <div id="setupMembers"></div>
-    <button class="add-member" onclick="addSetupMember()">+ Add another member</button>
+    <button class="add-member" id="setupAddBtn" onclick="addSetupMember()">+ Add another member</button>
     <button class="primary-btn" onclick="finishSetup()">Start using Vidhuvaru</button>
   </div>
 
@@ -854,13 +857,25 @@
    ============================================================ */
 
 const GOOGLE_CLIENT_ID='86052154480-pkm8qg3ur6udmbok0bclf3o0de0ecgsr.apps.googleusercontent.com';
-const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+const DRIVE_SCOPE='https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
 const DATA_FILE='vidhuvaru-data.json';
 const LS='vidhuvaru:';
 const SYNC_DELAY=3000;
 const RETRY_DELAY=30000;
-const VERSION='4.0';
+const VERSION='4.8';
 const DEFAULT_FX=15.42; // MVR per 1 USD (Maldivian pegged rate)
+
+// Pre-seeded family member names (used in setup screen as defaults)
+const SEED_MEMBERS=[
+  {name:'Fathuhulla Abdulla',role:'Father',workplace:'',livesIn:'hiya'},
+  {name:'Mariyam Abdulla',role:'Mother',workplace:'',livesIn:'hiya'},
+  {name:'Mohamed Fathik Fathuhulla',role:'Head',workplace:'',livesIn:'hiya'},
+  {name:'Fathimath Rauna Riyaz',role:'Spouse',workplace:'',livesIn:'hiya'},
+  {name:'Ahmed Farih Fathuhulla',role:'Brother',workplace:'',livesIn:'hiya'},
+  {name:'Adam Faseeh Fathuhulla',role:'Brother',workplace:'',livesIn:'hiya'},
+  {name:'Ibrahim Fazeel Fathuhulla',role:'Brother',workplace:'',livesIn:'hiya'},
+  {name:'Aishath Faleesha Fathuhulla',role:'Sister',workplace:'',livesIn:'hiya'},
+];
 
 const CATEGORIES=[
   {name:'Groceries',icon:'🛒',color:'#4caf7d'},
@@ -925,7 +940,7 @@ function applyTheme(palette,density,mood){
 
 /* ============== STATE ============== */
 let state={
-  members:[], expenses:[], loans:[], savings:[], accounts:[], budgets:[],
+  members:[], expenses:[], loans:[], savings:[], accounts:[], budgets:[], familyLoans:[],
   meta:{last_modified:null,version:VERSION,familyName:'Vidhuvaru',fxRate:DEFAULT_FX,createdAt:null,theme:{palette:'midnight',density:'regular',mood:'bold'}}
 };
 let session={ currentMember:null, googleToken:null, tokenExpiry:0, mode:'local', // 'local'|'cloud'
@@ -934,7 +949,7 @@ let currentTab='dashboard';
 let pinDraft='';
 let pinSelectedMemberId=null;
 let txDraft=null;
-let txFilter={house:'all', category:null};
+let txFilter={house:'all', category:null, scope:'household'};
 
 /* ============== HELPERS ============== */
 const $=(id)=>document.getElementById(id);
@@ -977,11 +992,18 @@ function migrate(s){
       else if(m.livesIn==='island')m.livesIn='vidhuvaru';
     }
   }
+  // v4.7 → v4.8: every expense gets scope='household' by default; arrays initialized
+  if(Array.isArray(s.expenses)){
+    for(const e of s.expenses){
+      if(!e.scope)e.scope='household';
+    }
+  }
+  if(!Array.isArray(s.familyLoans))s.familyLoans=[];
   s.meta=s.meta||{};
-  s.meta.version='4.0';
+  s.meta.version=VERSION;
   return s;
 }
-function loadState(){const s=lsGet('state');if(s){migrate(s);state=Object.assign(state,s)}if(!state.meta.fxRate)state.meta.fxRate=DEFAULT_FX;if(!state.meta.version)state.meta.version='4.0'}
+function loadState(){const s=lsGet('state');if(s){migrate(s);state=Object.assign(state,s)}if(!state.meta.fxRate)state.meta.fxRate=DEFAULT_FX;if(!state.meta.version)state.meta.version=VERSION;if(!Array.isArray(state.familyLoans))state.familyLoans=[]}
 
 /* ============== GOOGLE AUTH ============== */
 let tokenClient=null;
@@ -1077,6 +1099,23 @@ async function patchDriveFile(id,data){
 async function readDriveFile(id){
   const r=await driveFetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`);
   return r.json();
+}
+/** Share a Drive file with a user email as writer/editor.
+ *  Returns the permission object on success. */
+async function shareFileWithEmail(fileId, email, opts={}){
+  const sendNotification = opts.sendNotification!==false; // default true
+  const url=`https://www.googleapis.com/drive/v3/files/${fileId}/permissions?sendNotificationEmail=${sendNotification}&supportsAllDrives=true`;
+  const r=await driveFetch(url,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({role:'writer', type:'user', emailAddress:email})
+  });
+  return r.json();
+}
+async function listFilePermissions(fileId){
+  const r=await driveFetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions?fields=permissions(id,emailAddress,role,type,displayName)`);
+  const j=await r.json();
+  return j.permissions||[];
 }
 
 /** Pull latest from Drive. Returns:
@@ -1189,12 +1228,8 @@ function useLocal(){
   if(state.members.length>0){afterDataReady()}else{initSetup();show('setup')}
 }
 function afterDataReady(){
-  // try to remember last logged-in member
-  const lastMemId=lsGet('lastMember');
-  if(lastMemId){
-    const m=mem(lastMemId);
-    if(m){session.currentMember=m;enterMain();return}
-  }
+  // Always show PIN screen — never auto-bypass on a shared family device.
+  // initLogin() pre-selects the last member from cache for one-tap pick + PIN entry.
   initLogin();
   show('login');
 }
@@ -1202,9 +1237,8 @@ function afterDataReady(){
 /* ============== SETUP ============== */
 let setupRoster=[];
 function initSetup(){
-  setupRoster=[
-    {tmp_id:uid(),name:'',role:'Head',workplace:'',livesIn:'hiya',monthlyIncome:0,contribution:0,pin:'',notes:''}
-  ];
+  // Pre-seed with the 8 family members; PINs left blank (set on first use)
+  setupRoster=SEED_MEMBERS.map(s=>({tmp_id:uid(),...s,monthlyIncome:0,contribution:0,pin:'',notes:''}));
   renderSetup();
 }
 function addSetupMember(){
@@ -1218,31 +1252,34 @@ function renderSetup(){
     <div class="member-form">
       <div class="mf-head">
         <div class="mf-num">${i+1}</div>
-        <h4>${m.role||'Member'}</h4>
-        ${i>0?`<button class="mf-rm" onclick="removeSetupMember(${i})">Remove</button>`:'<span></span>'}
+        <h4>${escapeHTML(m.role||'Member')}</h4>
+        ${setupRoster.length>1?`<button class="mf-rm" onclick="removeSetupMember(${i})">Remove</button>`:'<span></span>'}
       </div>
       <div class="field"><label>Name</label><input value="${escapeHTML(m.name)}" oninput="setupRoster[${i}].name=this.value" placeholder="Full name"></div>
       <div class="grid-2">
         <div class="field"><label>Role</label><select onchange="setupRoster[${i}].role=this.value">${ROLES.map(r=>`<option ${r===m.role?'selected':''}>${r}</option>`).join('')}</select></div>
         <div class="field"><label>Lives in</label><select onchange="setupRoster[${i}].livesIn=this.value">${HOUSES.map(h=>`<option value="${h.id}" ${h.id===m.livesIn?'selected':''}>${h.label}</option>`).join('')}</select></div>
       </div>
-      <div class="field"><label>Workplace</label><input value="${escapeHTML(m.workplace)}" oninput="setupRoster[${i}].workplace=this.value" placeholder="Optional"></div>
+      <div class="field"><label>Workplace (optional)</label><input value="${escapeHTML(m.workplace)}" oninput="setupRoster[${i}].workplace=this.value" placeholder="Skip if not working"></div>
       <div class="grid-2">
-        <div class="field"><label>Monthly income (MVR)</label><input type="number" value="${m.monthlyIncome||''}" oninput="setupRoster[${i}].monthlyIncome=+this.value||0" placeholder="0"></div>
-        <div class="field"><label>4-digit PIN</label><input type="password" inputmode="numeric" maxlength="4" value="${m.pin}" oninput="setupRoster[${i}].pin=this.value.replace(/\\D/g,'').slice(0,4)" placeholder="••••"></div>
+        <div class="field"><label>Monthly income (optional)</label><input type="number" value="${m.monthlyIncome||''}" oninput="setupRoster[${i}].monthlyIncome=+this.value||0" placeholder="Set later"></div>
+        <div class="field"><label>PIN (they'll set on first login)</label><input type="password" inputmode="numeric" maxlength="4" value="${m.pin}" oninput="setupRoster[${i}].pin=this.value.replace(/\\D/g,'').slice(0,4)" placeholder="Leave blank"></div>
       </div>
     </div>`).join('');
+  // Hide add button when at max
+  const addBtn=$('setupAddBtn');
+  if(addBtn)addBtn.style.display = setupRoster.length>=MAX_MEMBERS ? 'none' : '';
 }
 function finishSetup(){
   // validate
   for(const m of setupRoster){
     if(!m.name.trim()){toast('Every member needs a name');return}
-    if(!/^\d{4}$/.test(m.pin)){toast(`${m.name||'Member'} needs a 4-digit PIN`);return}
+    if(m.pin && !/^\d{4}$/.test(m.pin)){toast(`${m.name||'Member'}: PIN must be 4 digits if set`);return}
   }
   state.members=setupRoster.map(m=>({
     id:uid('m'),name:m.name.trim(),role:m.role,workplace:m.workplace,livesIn:m.livesIn,
     monthlyIncome:{default:+m.monthlyIncome||0,[monthKey()]:+m.monthlyIncome||0},
-    contribution:+m.contribution||0,pin:m.pin,notes:m.notes||''
+    contribution:+m.contribution||0,pin:m.pin||'',notes:m.notes||''
   }));
   state.meta.createdAt=new Date().toISOString();
   state.meta.last_modified=new Date().toISOString();
@@ -1258,37 +1295,99 @@ function finishSetup(){
 }
 
 /* ============== LOGIN (PIN) ============== */
+// pinMode: 'enter' (returning user with PIN), 'set' (first time, choose PIN), 'confirm' (re-type to confirm new PIN)
+let pinMode='enter';
+let pinFirstHalf='';
 function initLogin(){
-  pinDraft='';pinSelectedMemberId=state.members[0]?.id||null;
+  pinDraft='';pinMode='enter';pinFirstHalf='';
+  const lastId=lsGet('lastMember');
+  pinSelectedMemberId = (lastId && mem(lastId)) ? lastId : (state.members[0]?.id||null);
+  // If selected member has no PIN yet → set-PIN flow
+  const m=mem(pinSelectedMemberId);
+  if(m && !m.pin){pinMode='set'}
   renderLogin();
 }
 function renderLogin(){
-  $('loginMembers').innerHTML=state.members.map(m=>`
-    <div class="mem-btn ${m.id===pinSelectedMemberId?'sel':''}" onclick="pickLoginMember('${m.id}')">
+  const sel=mem(pinSelectedMemberId);
+  // Title + sub change based on mode
+  let title='Who\'s using the app?',sub='Pick your name and enter your PIN.';
+  if(sel){
+    if(pinMode==='set'){title=`Hi ${sel.name.split(' ')[0]}`;sub='Choose a 4-digit PIN to lock your profile.'}
+    else if(pinMode==='confirm'){title=`Hi ${sel.name.split(' ')[0]}`;sub='Type your new PIN again to confirm.'}
+    else if(sel.pin){sub='Enter your PIN to continue.'}
+  }
+  // Find the heading & subhead in #login and update them
+  const card=$('login').querySelector('.login-card');
+  if(card){
+    const h=card.querySelector('h2');if(h)h.textContent=title;
+    const p=card.querySelector('p');if(p)p.textContent=sub;
+  }
+  $('loginMembers').innerHTML=state.members.map(m=>{
+    const hasNoPin = !m.pin;
+    return `<div class="mem-btn ${m.id===pinSelectedMemberId?'sel':''}" onclick="pickLoginMember('${m.id}')">
       <div class="av">${memInitial(m.name)}</div>
-      <div class="nm">${escapeHTML(m.name)}</div>
+      <div class="nm">${escapeHTML(m.name.split(' ')[0])}${hasNoPin?'<small style="display:block;font-size:9px;color:var(--gold);margin-top:2px">SET PIN</small>':''}</div>
       <div class="ro">${escapeHTML(m.role)}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   $('pinDots').innerHTML=[0,1,2,3].map(i=>`<div class="pin-dot ${i<pinDraft.length?'f':''}"></div>`).join('');
   $('pinPad').innerHTML=[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(k=>k===''?'<div></div>':`<button class="pin-key" onclick="pinTap('${k}')">${k}</button>`).join('');
   $('pinErr').textContent='';
+  // skip-button label
+  const skipBtn=$('login').querySelector('.pin-skip');
+  if(skipBtn)skipBtn.textContent = (pinMode==='set'||pinMode==='confirm') ? 'Cancel' : 'Skip and view only';
 }
-function pickLoginMember(id){pinSelectedMemberId=id;pinDraft='';renderLogin()}
+function pickLoginMember(id){
+  pinSelectedMemberId=id;pinDraft='';pinFirstHalf='';
+  const m=mem(id);
+  pinMode = (m && !m.pin) ? 'set' : 'enter';
+  renderLogin();
+}
 function pinTap(k){
   if(k==='⌫'){pinDraft=pinDraft.slice(0,-1);renderLogin();return}
   if(pinDraft.length>=4)return;
   pinDraft+=k;
   if(pinDraft.length===4){
     const m=mem(pinSelectedMemberId);
-    if(m&&m.pin===pinDraft){session.currentMember=m;lsSet('lastMember',m.id);enterMain()}
-    else{$('pinErr').textContent='Wrong PIN';setTimeout(()=>{pinDraft='';renderLogin()},600)}
+    if(!m){$('pinErr').textContent='No member';setTimeout(()=>{pinDraft='';renderLogin()},600);return}
+    if(pinMode==='enter'){
+      if(m.pin===pinDraft){session.currentMember=m;lsSet('lastMember',m.id);enterMain()}
+      else{$('pinErr').textContent='Wrong PIN';setTimeout(()=>{pinDraft='';renderLogin()},600)}
+    }else if(pinMode==='set'){
+      pinFirstHalf=pinDraft;pinDraft='';pinMode='confirm';renderLogin();
+    }else if(pinMode==='confirm'){
+      if(pinDraft===pinFirstHalf){
+        // Save PIN to the member's profile, sync to Drive, sign them in
+        m.pin=pinDraft;
+        saveState();
+        session.currentMember=m;lsSet('lastMember',m.id);enterMain();
+        toast('PIN set ✓');
+      }else{
+        $('pinErr').textContent="PINs don't match — try again";
+        setTimeout(()=>{pinDraft='';pinFirstHalf='';pinMode='set';renderLogin()},900);
+      }
+    }
   }else renderLogin();
 }
 function skipPin(){
+  if(pinMode==='set'||pinMode==='confirm'){
+    // "Cancel" — just go back to enter mode for a different member
+    pinMode='enter';pinDraft='';pinFirstHalf='';renderLogin();return;
+  }
   const m=state.members[0];
   if(!m){toast('No members yet');return}
   session.currentMember={...m,readOnly:true};
   enterMain();
+}
+
+// Change PIN flow — called from More tab
+function changeMyPin(){
+  const m=session.currentMember;if(!m)return;
+  m.pin='';
+  saveState();
+  toast('Set a new PIN on next visit');
+  pinSelectedMemberId=m.id;pinMode='set';pinDraft='';pinFirstHalf='';
+  show('login');renderLogin();
 }
 
 /* ============== MAIN ============== */
@@ -1347,7 +1446,22 @@ function go(tab){
 function rerenderAll(){if(session.currentMember)go(currentTab)}
 
 /* ============== COMPUTATIONS ============== */
-function monthExpenses(mk){return state.expenses.filter(e=>e.date&&e.date.slice(0,7)===mk && e.type!=='income')}
+// All non-income transactions for a month, optionally filtered by scope.
+// scope='household' → only family-shared bills/food/etc
+// scope='personal' → only the current member's personal expenses
+// scope='all' or omitted → everything (used for full activity list)
+function monthExpenses(mk, scope){
+  return state.expenses.filter(e=>{
+    if(!e.date||e.date.slice(0,7)!==mk)return false;
+    if(e.type==='income')return false;
+    if(scope==='household')return e.scope!=='personal';
+    if(scope==='personal'){
+      const meId=session.currentMember?.id;
+      return e.scope==='personal' && (e.paidBy===meId || !meId);
+    }
+    return true;
+  });
+}
 function monthIncome(mk){return state.expenses.filter(e=>e.date&&e.date.slice(0,7)===mk && e.type==='income')}
 function totalSavings(){return state.savings.reduce((s,r)=>s+(r.type==='deposit'?+r.amount:-(+r.amount)),0)}
 function totalLoans(){return state.loans.filter(l=>l.status!=='paidoff'&&l.status!=='defaulted').reduce((s,l)=>s+(+l.balance||0),0)}
@@ -1365,43 +1479,73 @@ function netPosition(){
   // Family net position in MVR
   return totalSavings() + accountBalanceMVR() - totalLoans();
 }
+// What each member "owes" toward household bills this month based on contributions
+function memberHouseShare(memberId, mk){
+  const exps=monthExpenses(mk,'household').filter(e=>e.type==='expense');
+  let share=0;
+  for(const e of exps){
+    const amt=toMVR(e.amount,e.currency||'MVR');
+    if(e.contributions && Object.keys(e.contributions).length>0){
+      share += toMVR(+(e.contributions[memberId]||0), e.currency||'MVR');
+    } else if(e.paidBy===memberId){
+      share += amt;
+    }
+  }
+  return share;
+}
+// What each member actually paid out of pocket toward household bills this month
+function memberHousePaid(memberId, mk){
+  return monthExpenses(mk,'household').filter(e=>e.type==='expense' && e.paidBy===memberId)
+    .reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
+}
+// Inter-family lending: who owes whom (positive = they owe you)
+function familyLendingBalance(memberId){
+  let net=0;
+  for(const l of (state.familyLoans||[])){
+    const amt=+l.amount||0, paid=+l.paid||0, remain=amt-paid;
+    if(l.lender===memberId) net+=remain;
+    if(l.borrower===memberId) net-=remain;
+  }
+  return net;
+}
 
 /* ============== DASHBOARD ============== */
 function renderDashboard(){
   const mk=monthKey();
-  const exps=monthExpenses(mk);
+  const exps=monthExpenses(mk,'household');
   const monthSpend=exps.reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
   const monthInc=familyMonthlyIncome(mk);
   const monthLoan=totalMonthlyLoanPay();
   const net=netPosition();
 
-  // 6 month spending history for trend
+  // 6 month spending history for trend (household only)
   const months=[];const now=new Date();
   for(let i=5;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);const k=d.toISOString().slice(0,7);
-    const tot=monthExpenses(k).reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
+    const tot=monthExpenses(k,'household').reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
     months.push({k,label:fmtMonthLab(k),total:tot});
   }
   const trend=months[5].total - months[4].total;
   const trendPct=months[4].total>0?Math.round((trend/months[4].total)*100):0;
 
-  // house split: in v4 houses are 'hiya' (Hiya Flat, Malé) and 'vidhuvaru' (Island)
+  // house split (household only)
   const hiyaSpend=exps.filter(e=>e.house==='hiya'||e.house==='both').reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
   const vidhuSpend=exps.filter(e=>e.house==='vidhuvaru'||e.house==='both').reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
   const houseTot=hiyaSpend+vidhuSpend||1;
 
-  // recent transactions
-  const recent=[...state.expenses].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.id||'').localeCompare(a.id||'')).slice(0,5);
+  // recent transactions (household scope only on family dashboard)
+  const recent=[...state.expenses].filter(e=>e.scope!=='personal').sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.id||'').localeCompare(a.id||'')).slice(0,5);
 
   // accounts strip
   const accs=state.accounts.slice(0,10);
   const usdTotal=state.accounts.filter(a=>a.currency==='USD').reduce((s,a)=>s+(+a.balance||0),0);
 
-  // per-member breakdown this month
+  // per-member breakdown for the household this month: their SHARE of household bills
   const memberRows=state.members.map(m=>{
     const inc=(+m.monthlyIncome?.[mk]||+m.monthlyIncome?.default||0);
-    const spent=exps.filter(e=>e.paidBy===m.id).reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
+    const share=memberHouseShare(m.id,mk);                   // their portion of household bills
+    const paid=memberHousePaid(m.id,mk);                     // what they actually paid out
     const loans=state.loans.filter(l=>l.borrower===m.id&&l.status==='active').reduce((s,l)=>s+(+l.monthlyPayment||0),0);
-    return {m,inc,spent,loans,net:inc-spent-loans};
+    return {m,inc,share,paid,loans,net:paid-share}; // positive = lent to household; negative = owes household
   });
 
   // Format net: split into whole and cents
@@ -1504,17 +1648,20 @@ function renderDashboard(){
     </div>
 
     <div class="section-h">
-      <div class="h">Per <em>member</em></div>
+      <div class="h"><em>Household</em> share · this month</div>
     </div>
     <div class="recent">
-      ${memberRows.map(r=>`<div class="pm-row">
-        <div class="pm-av">${memInitial(r.m.name)}</div>
-        <div class="pm-body">
-          <div class="pm-nm">${escapeHTML(r.m.name)}<small>· ${escapeHTML(r.m.role)}</small></div>
-          <div class="pm-sub">+${fmtNum(r.inc)} in · −${fmtNum(r.spent+r.loans)} out</div>
-        </div>
-        <div class="pm-net ${r.net>=0?'pos':'neg'}">${r.net>=0?'+':'−'}${fmtNum(Math.abs(r.net))}</div>
-      </div>`).join('')}
+      ${memberRows.map(r=>{
+        const balText = r.net>=0 ? `${fmtNum(r.net)} ahead` : `${fmtNum(Math.abs(r.net))} owed`;
+        return `<div class="pm-row">
+          <div class="pm-av">${memInitial(r.m.name)}</div>
+          <div class="pm-body">
+            <div class="pm-nm">${escapeHTML(r.m.name.split(' ').slice(0,2).join(' '))}<small>· ${escapeHTML(r.m.role)}</small></div>
+            <div class="pm-sub">Paid ${fmtNum(r.paid)} · Share ${fmtNum(r.share)}</div>
+          </div>
+          <div class="pm-net ${r.net>=0?'pos':'neg'}">${balText}</div>
+        </div>`;
+      }).join('')}
     </div>
   `;
 }
@@ -1523,7 +1670,16 @@ function renderLoggedInCard(){return ''}
 
 /* ============== TRANSACTIONS ============== */
 function renderTx(){
-  let exps=[...state.expenses].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const meId=session.currentMember?.id;
+  // scope filter: 'household' (default), 'mine' (my personal only), 'all-mine' (household + my personal)
+  const sf = txFilter.scope || 'household';
+  let exps=state.expenses.filter(e=>{
+    if(sf==='household')return e.scope!=='personal';
+    if(sf==='mine')return e.scope==='personal' && e.paidBy===meId;
+    if(sf==='all-mine')return e.scope!=='personal' || e.paidBy===meId; // household + my own personal
+    return true;
+  });
+  exps.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   if(txFilter.house!=='all')exps=exps.filter(e=>e.house===txFilter.house||e.house==='both');
   if(txFilter.category)exps=exps.filter(e=>e.category===txFilter.category);
   // Net total: income positive, expense negative
@@ -1534,13 +1690,19 @@ function renderTx(){
   exps.forEach(e=>{(groups[e.date]=groups[e.date]||[]).push(e)});
   const days=Object.keys(groups).sort((a,b)=>b.localeCompare(a));
 
-  // category chips
-  const allCats=[...new Set(state.expenses.map(e=>e.category))].slice(0,12);
+  // category chips (from currently filtered scope)
+  const allCats=[...new Set(exps.map(e=>e.category))].slice(0,12);
 
   $('tabTx').innerHTML=`
     <div class="activity-h">
       <div class="title">Your <em>activity</em></div>
       <div class="meta">${exps.length} transactions · net ${total>=0?'+':'−'}MVR ${fmtNum(Math.abs(total))}</div>
+    </div>
+
+    <div class="chips">
+      <div class="chip ${sf==='household'?'act':''}" onclick="setTxFilter('scope','household')">🏠 Household</div>
+      <div class="chip ${sf==='mine'?'act':''}" onclick="setTxFilter('scope','mine')">👤 My personal</div>
+      <div class="chip ${sf==='all-mine'?'act':''}" onclick="setTxFilter('scope','all-mine')">All mine</div>
     </div>
 
     <div class="chips">
@@ -1576,7 +1738,7 @@ function renderTx(){
     }).join('')}
   `;
 }
-function setTxFilter(k,v){txFilter[k]=v;renderTx()}
+function setTxFilter(k,v){txFilter[k]=v;if(k==='scope')txFilter.category=null;renderTx()}
 
 /* ============== STATS ============== */
 function renderStats(){
@@ -1584,21 +1746,22 @@ function renderStats(){
   const monthly=[];
   for(let i=0;i<12;i++){
     const k=`${year}-${String(i+1).padStart(2,'0')}`;
-    const tot=monthExpenses(k).reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
+    const tot=monthExpenses(k,'household').reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
     monthly.push({k,label:fmtMonthLab(k),total:tot,isCur:i===curMonth});
   }
   const max=Math.max(...monthly.map(m=>m.total),1);
 
   const mk=monthKey();
-  const exps=monthExpenses(mk);
+  const exps=monthExpenses(mk,'household');
   const byCat={};
   exps.forEach(e=>{const v=toMVR(e.amount,e.currency||'MVR');byCat[e.category]=(byCat[e.category]||0)+v});
   const sorted=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
   const monthTotal=sorted.reduce((s,[,v])=>s+v,0);
 
+  // Per-member: use SHARE (so contributions split is reflected fairly)
   const byMem={};
-  exps.forEach(e=>{byMem[e.paidBy]=(byMem[e.paidBy]||0)+toMVR(e.amount,e.currency||'MVR')});
-  const memSorted=Object.entries(byMem).sort((a,b)=>b[1]-a[1]);
+  state.members.forEach(m=>{byMem[m.id]=memberHouseShare(m.id,mk)});
+  const memSorted=Object.entries(byMem).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
 
   $('tabStats').innerHTML=`
     <div class="stats-h">
@@ -1640,24 +1803,64 @@ function renderStats(){
     </div>
 
     <div class="stats-card">
-      <div class="stats-card-hd"><h3>Per member</h3></div>
+      <div class="stats-card-hd"><h3>Per member · household share</h3></div>
       ${memSorted.length===0?`<div class="empty" style="padding:14px 0">No member spending yet</div>`:memSorted.map(([id,v])=>{const m=mem(id);if(!m)return'';const p=monthTotal>0?Math.round((v/monthTotal)*100):0;return `
         <div class="pm-row">
           <div class="pm-av">${memInitial(m.name)}</div>
           <div class="pm-body">
-            <div class="pm-nm">${escapeHTML(m.name)}<small>· ${escapeHTML(m.role)}</small></div>
-            <div class="pm-sub">${p}% of household spending</div>
+            <div class="pm-nm">${escapeHTML(m.name.split(' ').slice(0,2).join(' '))}<small>· ${escapeHTML(m.role)}</small></div>
+            <div class="pm-sub">${p}% of household share</div>
           </div>
           <div class="pm-net" style="color:var(--fg)">${fmtNum(v)}</div>
         </div>`}).join('')}
     </div>
+
+    ${(()=>{
+      // Personal spending across the family — category totals only, no descriptions
+      // (privacy-respecting view per Faathik's settings)
+      const allPersonal=state.expenses.filter(e=>e.date&&e.date.slice(0,7)===mk && e.type==='expense' && e.scope==='personal');
+      if(allPersonal.length===0)return '';
+      const byMemCat={}; // {memberId: {cat: total}}
+      const memTotals={};
+      for(const e of allPersonal){
+        const mid=e.paidBy;
+        const v=toMVR(e.amount,e.currency||'MVR');
+        byMemCat[mid]=byMemCat[mid]||{};
+        byMemCat[mid][e.category]=(byMemCat[mid][e.category]||0)+v;
+        memTotals[mid]=(memTotals[mid]||0)+v;
+      }
+      const sortedMems=Object.entries(memTotals).sort((a,b)=>b[1]-a[1]);
+      return `<div class="stats-card">
+        <div class="stats-card-hd"><h3>Personal spending · by member</h3></div>
+        <div style="font-size:11px;color:var(--fg-3);margin-bottom:10px;font-family:var(--font-mono)">Categories shown only — descriptions stay private</div>
+        ${sortedMems.map(([mid,total])=>{
+          const m=mem(mid);if(!m)return'';
+          const cats=Object.entries(byMemCat[mid]).sort((a,b)=>b[1]-a[1]);
+          return `<div style="padding:10px 0;border-top:1px solid rgba(255,255,255,.05)">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <div class="pm-av" style="width:30px;height:30px;font-size:13px">${memInitial(m.name)}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600;color:var(--fg);letter-spacing:-.01em">${escapeHTML(m.name.split(' ').slice(0,2).join(' '))}</div>
+                <div style="font-size:10px;color:var(--fg-3);font-family:var(--font-mono)">${cats.length} categor${cats.length===1?'y':'ies'}</div>
+              </div>
+              <div style="font-family:var(--font-mono);font-size:14px;font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums">${fmtNum(total)}</div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              ${cats.map(([cn,cv])=>{const c=cat(cn);return `<div style="display:inline-flex;align-items:center;gap:5px;padding:4px 9px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:999px;font-size:11px">
+                <span>${c.icon}</span><span style="color:var(--fg-1)">${escapeHTML(cn)}</span><span style="color:var(--fg-3);font-family:var(--font-mono);font-weight:600">${fmtNum(cv)}</span>
+              </div>`}).join('')}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    })()}
   `;
 }
 
 /* ============== BUDGET ============== */
 function renderBudget(){
   const mk=monthKey();
-  const exps=monthExpenses(mk);
+  const exps=monthExpenses(mk,'household');
   const spent={};
   exps.forEach(e=>{spent[e.category]=(spent[e.category]||0)+toMVR(e.amount,e.currency||'MVR')});
 
@@ -1713,15 +1916,90 @@ function renderMore(){
   if(!m){$('tabMore').innerHTML='<div class="empty">No profile</div>';return}
   const isHead=m.role==='Head';
   const theme=state.meta.theme||{palette:'midnight',density:'regular',mood:'bold'};
+  const mk=monthKey();
+  const myPersonal=monthExpenses(mk,'personal');
+  const myPersonalTotal=myPersonal.reduce((s,e)=>s+toMVR(e.amount,e.currency||'MVR'),0);
+  const myHouseShare=memberHouseShare(m.id,mk);
+  const myHousePaid=memberHousePaid(m.id,mk);
+  const myInc=(+m.monthlyIncome?.[mk]||+m.monthlyIncome?.default||0);
+  const myLendBal=familyLendingBalance(m.id);
+  // by category for current member's personal expenses
+  const myByCat={};
+  myPersonal.forEach(e=>{const v=toMVR(e.amount,e.currency||'MVR');myByCat[e.category]=(myByCat[e.category]||0)+v});
+  const mySortedCat=Object.entries(myByCat).sort((a,b)=>b[1]-a[1]);
   $('tabMore').innerHTML=`
     <div class="prof-card">
       <div class="prof-av">${memInitial(m.name)}</div>
       <div class="prof-info">
-        <div class="prof-nm">${escapeHTML(m.name)}</div>
+        <div class="prof-nm">${escapeHTML(m.name.split(' ').slice(0,2).join(' '))}</div>
         <div class="prof-rl">${escapeHTML(m.role)}${isHead?' · ADMIN':''}</div>
         <div class="prof-wp">${escapeHTML(m.workplace||'—')}</div>
       </div>
       <button class="prof-edit" onclick="openMember('${m.id}')">Edit</button>
+    </div>
+
+    <div class="stats-card">
+      <div class="stats-card-hd"><h3>My finance · ${new Date().toLocaleString('en',{month:'long'})}</h3></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="padding:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-2);font-weight:700">Income</div>
+          <div style="font-family:var(--font-serif);font-size:22px;font-weight:500;color:var(--green-400);margin-top:4px;font-variant-numeric:tabular-nums">${fmtNum(myInc)}</div>
+          <div style="font-size:10px;color:var(--fg-3);margin-top:2px;font-family:var(--font-mono)">MVR / month</div>
+        </div>
+        <div style="padding:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-2);font-weight:700">Personal spent</div>
+          <div style="font-family:var(--font-serif);font-size:22px;font-weight:500;color:var(--red-400);margin-top:4px;font-variant-numeric:tabular-nums">${fmtNum(myPersonalTotal)}</div>
+          <div style="font-size:10px;color:var(--fg-3);margin-top:2px;font-family:var(--font-mono)">MVR this month</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="padding:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-2);font-weight:700">Household share</div>
+          <div style="font-family:var(--font-mono);font-size:16px;font-weight:600;color:var(--fg);margin-top:4px;font-variant-numeric:tabular-nums">${fmtNum(myHouseShare)}</div>
+          <div style="font-size:10px;color:var(--fg-3);margin-top:2px">Paid ${fmtNum(myHousePaid)} of bills</div>
+        </div>
+        <div style="padding:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-2);font-weight:700">Net leftover</div>
+          <div style="font-family:var(--font-serif);font-size:18px;font-weight:600;color:${(myInc-myPersonalTotal-myHouseShare)>=0?'var(--green-400)':'var(--red-400)'};margin-top:4px;font-variant-numeric:tabular-nums">${(myInc-myPersonalTotal-myHouseShare)>=0?'+':'−'}${fmtNum(Math.abs(myInc-myPersonalTotal-myHouseShare))}</div>
+          <div style="font-size:10px;color:var(--fg-3);margin-top:2px">Income − bills − personal</div>
+        </div>
+      </div>
+      ${mySortedCat.length>0?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.05)">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-2);font-weight:700;margin-bottom:8px">Where my money goes</div>
+        ${mySortedCat.map(([cn,v])=>{const c=cat(cn);const p=Math.round((v/myPersonalTotal)*100);return `
+          <div class="cat-bar"><div class="cat-bar-top"><span>${c.icon} ${escapeHTML(cn)}</span><span>${fmtMVR(v)} · ${p}%</span></div>
+            <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${p}%;background:${c.color}"></div></div></div>`}).join('')}
+      </div>`:'<div class="empty" style="padding:10px 0">No personal expenses yet — tap + to log one as Personal</div>'}
+    </div>
+
+    <div class="stats-card">
+      <div class="stats-card-hd"><h3>Family lending</h3><span class="more" onclick="openFamilyLoan()" style="font-size:11px;color:var(--p-gold,var(--gold));cursor:pointer;font-weight:600">+ NEW IOU</span></div>
+      ${(state.familyLoans||[]).length===0?`<div class="empty" style="padding:14px 0">No IOUs recorded</div>`:`
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+          <div style="padding:10px;background:rgba(94,200,140,.06);border:1px solid rgba(94,200,140,.18);border-radius:12px">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--green-400);font-weight:700">You're owed</div>
+            <div style="font-family:var(--font-serif);font-size:18px;font-weight:600;color:var(--green-400);margin-top:3px;font-variant-numeric:tabular-nums">${myLendBal>0?fmtNum(myLendBal):'0.00'}</div>
+          </div>
+          <div style="padding:10px;background:rgba(255,107,92,.06);border:1px solid rgba(255,107,92,.18);border-radius:12px">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--red-400);font-weight:700">You owe</div>
+            <div style="font-family:var(--font-serif);font-size:18px;font-weight:600;color:var(--red-400);margin-top:3px;font-variant-numeric:tabular-nums">${myLendBal<0?fmtNum(Math.abs(myLendBal)):'0.00'}</div>
+          </div>
+        </div>
+        ${(state.familyLoans||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,8).map(l=>{
+          const lender=mem(l.lender), borrower=mem(l.borrower);
+          const remain=(+l.amount||0)-(+l.paid||0);
+          const isMine=l.lender===m.id||l.borrower===m.id;
+          const cls = remain<=0 ? 'gn' : (l.borrower===m.id ? 'rd' : 'gd');
+          return `<div class="list-row" onclick="openFamilyLoan('${l.id}')">
+            <div class="list-ic" style="background:${remain<=0?'rgba(94,200,140,.18)':'rgba(212,165,116,.14)'};color:${remain<=0?'var(--green-400)':'var(--p-gold)'}">${remain<=0?'✓':'⇄'}</div>
+            <div class="list-body">
+              <div class="list-pri">${lender?escapeHTML(lender.name.split(' ')[0]):'?'} → ${borrower?escapeHTML(borrower.name.split(' ')[0]):'?'}${isMine?' <small style="color:var(--p-gold);font-weight:700">YOU</small>':''}</div>
+              <div class="list-sec">${escapeHTML(l.purpose||'Loan')} · ${dateRel(l.date)} · ${remain>0?fmtMVR(remain)+' left':'Settled'}</div>
+            </div>
+            <div class="list-rt ${cls}">${fmtNum(l.amount)}</div>
+          </div>`;
+        }).join('')}
+      `}
     </div>
 
     <div class="stats-card">
@@ -1819,15 +2097,18 @@ function renderMore(){
     <div class="stats-card">
       <div class="stats-card-hd"><h3>Settings</h3></div>
       <div class="list-row" onclick="go('budget')"><div class="list-ic">🎯</div><div class="list-body"><div class="list-pri">Budgets</div><div class="list-sec">Set monthly spending limits</div></div><div class="list-rt">›</div></div>
+      <div class="list-row" onclick="openFamilyLoan()"><div class="list-ic">⇄</div><div class="list-body"><div class="list-pri">Record an IOU</div><div class="list-sec">Track money lent between family</div></div><div class="list-rt">›</div></div>
+      ${isHead&&session.mode==='cloud'?`<div class="list-row" onclick="openShareWithFamily()"><div class="list-ic">📤</div><div class="list-body"><div class="list-pri">Share with family</div><div class="list-sec">Give each member access via their own Gmail</div></div><div class="list-rt">›</div></div>`:''}
       <div class="list-row" onclick="openFx()"><div class="list-ic">💱</div><div class="list-body"><div class="list-pri">Exchange rate</div><div class="list-sec">1 USD = ${state.meta.fxRate||DEFAULT_FX} MVR</div></div><div class="list-rt">›</div></div>
       <div class="list-row" onclick="exportJSON()"><div class="list-ic">📥</div><div class="list-body"><div class="list-pri">Export data (JSON)</div><div class="list-sec">Backup to a file</div></div><div class="list-rt">›</div></div>
       <div class="list-row" onclick="switchUser()"><div class="list-ic">👤</div><div class="list-body"><div class="list-pri">Switch user</div><div class="list-sec">Pick a different family member</div></div><div class="list-rt">›</div></div>
+      <div class="list-row" onclick="changeMyPin()"><div class="list-ic">🔢</div><div class="list-body"><div class="list-pri">Change my PIN</div><div class="list-sec">Reset and choose a new one</div></div><div class="list-rt">›</div></div>
       ${session.mode==='cloud'?`<div class="list-row" onclick="signOutGoogle()"><div class="list-ic">🚪</div><div class="list-body"><div class="list-pri">Sign out of Google</div><div class="list-sec">Disconnect cloud sync</div></div><div class="list-rt">›</div></div>`:''}
       ${isHead?`<button class="danger-btn" onclick="resetAll()">Reset everything</button>`:''}
     </div>
   `;
 }
-function switchUser(){lsDel('lastMember');initLogin();show('login')}
+function switchUser(){lsDel('lastMember');pinSelectedMemberId=null;initLogin();show('login')}
 function pullNow(){pullFromDrive().then(r=>{if(r.applied){toast('Updated from cloud');rerenderAll()}else if(r.found){toast('Already up to date')}else{toast('No cloud file yet')}})}
 async function cleanupDuplicatesUI(){
   if(!confirm(`Delete ${session.duplicateFileCount-1} older copies of your data from Drive? The newest copy stays.`))return;
@@ -1878,12 +2159,51 @@ $('modalBg').addEventListener('click',e=>{if(e.target.id==='modalBg')closeModal(
 
 /* ============== TRANSACTION MODAL ============== */
 function openTx(id){
-  if(id){const e=state.expenses.find(x=>x.id===id);if(!e)return;txDraft={...e}}
-  else{txDraft={id:null,date:todayISO(),house:'hiya',category:'Groceries',description:'',paidBy:session.currentMember?.id||state.members[0]?.id,account:state.accounts[0]?.id||'',amount:'',currency:'MVR',type:'expense',note:''}}
+  if(id){const e=state.expenses.find(x=>x.id===id);if(!e)return;txDraft={...e,contributions:e.contributions?{...e.contributions}:{}}}
+  else{txDraft={id:null,date:todayISO(),house:'hiya',category:'Groceries',description:'',paidBy:session.currentMember?.id||state.members[0]?.id,account:state.accounts[0]?.id||'',amount:'',currency:'MVR',type:'expense',note:'',scope:'household',contributions:{}}}
+  renderTxModal();
+}
+// Split helpers used by the modal
+function txSplitToggle(){
+  txDraft.contributions = txDraft.contributions && Object.keys(txDraft.contributions).length>0 ? {} : equalSplitForHouse(txDraft.house, +txDraft.amount||0);
+  renderTxModal();
+}
+function equalSplitForHouse(houseId, total){
+  // Split among members who live in that house (or both)
+  const candidates = state.members.filter(m =>
+    houseId==='both' ? true : (m.livesIn===houseId || m.livesIn==='both')
+  );
+  if(candidates.length===0)return {};
+  const each = Math.round((total / candidates.length) * 100) / 100;
+  const o = {};
+  candidates.forEach((m,i)=>{
+    // Last member absorbs rounding so sum matches exactly
+    o[m.id] = (i===candidates.length-1) ? Math.round((total - each*(candidates.length-1)) * 100)/100 : each;
+  });
+  return o;
+}
+function txSetContribution(memberId, val){
+  if(!txDraft.contributions)txDraft.contributions={};
+  const v = +val;
+  if(v>0)txDraft.contributions[memberId]=v;
+  else delete txDraft.contributions[memberId];
+  // Update DOM live — no full re-render so input keeps focus
+  const sumEl=document.getElementById('txSplitSum');
+  if(sumEl){
+    const sum=Object.values(txDraft.contributions).reduce((s,v)=>s+(+v||0),0);
+    const target=+txDraft.amount||0;
+    sumEl.textContent=`${fmtNum(sum)} / ${fmtNum(target)}`;
+    sumEl.style.color = Math.abs(sum-target)<0.01 ? 'var(--green-400)' : 'var(--amber-400)';
+  }
+}
+function txSplitEqual(){
+  txDraft.contributions = equalSplitForHouse(txDraft.house, +txDraft.amount||0);
   renderTxModal();
 }
 function renderTxModal(){
   const t=txDraft;
+  const splitOn = !!(t.contributions && Object.keys(t.contributions).length>0);
+  const isHousehold = t.scope!=='personal';
   openModal(`
     <div class="modal-hd"><h3>${t.id?'Edit':'New entry'}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
     ${t.id?'':`
@@ -1892,6 +2212,11 @@ function renderTxModal(){
       <textarea id="nlpInput" class="nlp-input" placeholder='Type naturally:&#10;"coffee with friends 50 rf"&#10;"stelco 1240"&#10;"villaggio groceries 850"'></textarea>
       <div class="nlp-foot"><span class="nlp-hint">Or paste a BML SMS</span><button class="nlp-btn" onclick="nlpParseAndFill()">Parse →</button></div>
     </div>`}
+
+    <div class="seg" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+      <button class="${isHousehold?'act':''}" onclick="txDraft.scope='household';renderTxModal()" style="${isHousehold?'color:var(--p-gold,var(--gold))':''}">🏠 Household</button>
+      <button class="${!isHousehold?'act':''}" onclick="txDraft.scope='personal';txDraft.contributions={};renderTxModal()" style="${!isHousehold?'color:var(--violet-400)':''}">👤 Personal</button>
+    </div>
 
     <div class="seg">
       <button class="${t.type==='expense'?'act exp':''}" onclick="txDraft.type='expense';renderTxModal()">expense</button>
@@ -1915,7 +2240,7 @@ function renderTxModal(){
       </div>
     </div>
 
-    <div class="f-group">
+    ${isHousehold?`<div class="f-group">
       <div class="f-lab">House</div>
       <div class="house-pick">
         ${HOUSES.map(h=>`<button class="${t.house===h.id?'act':''}" onclick="txDraft.house='${h.id}';renderTxModal()">
@@ -1924,17 +2249,47 @@ function renderTxModal(){
           <div class="sub">${h.sub||''}</div>
         </button>`).join('')}
       </div>
-    </div>
+    </div>`:''}
 
     <div class="f-group">
       <div class="f-lab">Paid by</div>
       <div class="mem-pick">
         ${state.members.map(m=>`<button class="${m.id===t.paidBy?'act':''}" onclick="txDraft.paidBy='${m.id}';renderTxModal()">
           <span class="av">${memInitial(m.name)}</span>
-          <span class="nm">${escapeHTML(m.name)}</span>
+          <span class="nm">${escapeHTML(m.name.split(' ')[0])}</span>
         </button>`).join('')}
       </div>
     </div>
+
+    ${isHousehold&&t.type==='expense'?`<div class="f-group">
+      <div class="f-lab" style="display:flex;justify-content:space-between;align-items:baseline">
+        <span>Split this bill?</span>
+        <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;color:var(--p-gold,var(--gold));font-size:11px">
+          <input type="checkbox" ${splitOn?'checked':''} onchange="txSplitToggle()" style="accent-color:var(--p-gold,var(--gold))">
+          <span>${splitOn?'ON':'OFF'}</span>
+        </label>
+      </div>
+      ${splitOn?`<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px">
+          <span style="font-size:11px;color:var(--fg-2);font-weight:600;text-transform:uppercase;letter-spacing:.1em">Contributions</span>
+          <button onclick="txSplitEqual()" style="font-size:11px;color:var(--p-gold,var(--gold));font-weight:600;background:none;border:none;cursor:pointer">⇋ Split equally</button>
+        </div>
+        ${state.members.map(m=>{
+          const v = +(t.contributions?.[m.id]||0);
+          return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,color-mix(in oklab,var(--p-gold) 25%,transparent),color-mix(in oklab,var(--p-gold) 6%,transparent));color:var(--p-gold);display:flex;align-items:center;justify-content:center;font-family:var(--font-serif);font-size:13px;font-weight:500;flex-shrink:0">${memInitial(m.name)}</div>
+            <div style="flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--fg);letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(m.name.split(' ')[0])}</div>
+            <input type="number" step="0.01" value="${v>0?v:''}" placeholder="0"
+              oninput="txSetContribution('${m.id}',this.value)"
+              style="width:90px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:9px;padding:7px 10px;color:var(--fg);font-family:var(--font-mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums">
+          </div>`;
+        }).join('')}
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.05);font-family:var(--font-mono);font-size:12px">
+          <span style="color:var(--fg-2)">Sum / Total</span>
+          <span id="txSplitSum" style="font-weight:700">${fmtNum(Object.values(t.contributions||{}).reduce((s,v)=>s+(+v||0),0))} / ${fmtNum(+t.amount||0)}</span>
+        </div>
+      </div>`:''}
+    </div>`:''}
 
     <div class="grid-2">
       <div class="field"><label>Currency</label><select onchange="txDraft.currency=this.value;renderTxModal()">${CURRENCIES.map(c=>`<option value="${c.code}" ${c.code===t.currency?'selected':''}>${c.symbol} ${c.code}</option>`).join('')}</select></div>
@@ -1943,7 +2298,7 @@ function renderTxModal(){
 
     <div class="field"><label>Description</label><input value="${escapeHTML(t.description)}" oninput="txDraft.description=this.value" placeholder="What was it for?"></div>
 
-    <div class="field"><label>Account (optional)</label><select onchange="txDraft.account=this.value"><option value="">— None —</option>${state.accounts.map(a=>`<option value="${a.id}" ${a.id===t.account?'selected':''}>${escapeHTML(a.name)} (${a.currency})</option>`).join('')}</select></div>
+    <div class="field"><label>Account (optional)</label><select onchange="txDraft.account=this.value"><option value="">— None —</option>${state.accounts.filter(a=>!isHousehold?a.owner===t.paidBy:true).map(a=>`<option value="${a.id}" ${a.id===t.account?'selected':''}>${escapeHTML(a.name)} (${a.currency})</option>`).join('')}</select></div>
 
     <div class="field"><label>Note (optional)</label><textarea oninput="txDraft.note=this.value">${escapeHTML(t.note||'')}</textarea></div>
 
@@ -2038,11 +2393,24 @@ function saveTx(){
   const t=txDraft;
   if(!t.amount||+t.amount<=0){toast('Enter an amount');return}
   if(!t.paidBy){toast('Pick who paid');return}
+  const scope = t.scope==='personal' ? 'personal' : 'household';
+  let contributions = null;
+  if(scope==='household' && t.type==='expense' && t.contributions && Object.keys(t.contributions).length>0){
+    // Validate sum approximately matches amount
+    const sum=Object.values(t.contributions).reduce((s,v)=>s+(+v||0),0);
+    const target=+t.amount;
+    if(Math.abs(sum-target)>0.5){
+      if(!confirm(`Split sum (${fmtNum(sum)}) doesn't match total (${fmtNum(target)}). Save anyway?`))return;
+    }
+    contributions = {};
+    Object.entries(t.contributions).forEach(([k,v])=>{if(+v>0)contributions[k]=+v});
+  }
   const rec={
-    id:t.id||uid('e'),date:t.date,house:t.house,category:t.category,
+    id:t.id||uid('e'),date:t.date,house:scope==='personal'?'both':t.house,category:t.category,
     description:t.description.trim(),paidBy:t.paidBy,account:t.account,
-    amount:+t.amount,currency:t.currency,type:t.type,note:t.note||''
+    amount:+t.amount,currency:t.currency,type:t.type,note:t.note||'',scope
   };
+  if(contributions)rec.contributions=contributions;
   // update account balance if linked
   const a=acc(rec.account);
   if(a){
@@ -2187,6 +2555,189 @@ function saveSav(){
   saveState();closeModal();rerenderAll();toast('Saved');
 }
 function deleteSav(){const i=state.savings.findIndex(x=>x.id===savDraft.id);if(i>=0){state.savings.splice(i,1);saveState();closeModal();rerenderAll();toast('Deleted')}}
+
+/* ============== FAMILY LENDING MODAL ============== */
+let famLoanDraft=null;
+function openFamilyLoan(id){
+  if(id){
+    const l=(state.familyLoans||[]).find(x=>x.id===id);
+    if(!l)return;
+    famLoanDraft={...l};
+  } else {
+    const meId=session.currentMember?.id;
+    const other=state.members.find(m=>m.id!==meId);
+    famLoanDraft={id:null,date:todayISO(),lender:meId,borrower:other?.id||state.members[0]?.id,amount:0,paid:0,purpose:'',note:''};
+  }
+  renderFamilyLoanModal();
+}
+function renderFamilyLoanModal(){
+  const l=famLoanDraft;
+  const remain=Math.max(0,(+l.amount||0)-(+l.paid||0));
+  openModal(`
+    <div class="modal-hd"><h3>${l.id?'Edit IOU':'New IOU'}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div style="background:rgba(212,165,116,.06);border:1px solid rgba(212,165,116,.2);border-radius:14px;padding:12px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--fg-2);font-weight:700">Outstanding</div>
+        <div style="font-family:var(--font-serif);font-size:20px;font-weight:600;color:${remain>0?'var(--p-gold)':'var(--green-400)'};margin-top:2px;font-variant-numeric:tabular-nums">${remain>0?fmtMVR(remain):'Settled ✓'}</div>
+      </div>
+      <div style="font-size:11px;color:var(--fg-3);text-align:right;font-family:var(--font-mono)">${fmtNum(+l.paid||0)} paid<br/>of ${fmtNum(+l.amount||0)}</div>
+    </div>
+    <div class="big-amt">
+      <div class="row"><span class="ccy">MVR</span><input type="number" step="0.01" value="${l.amount||''}" oninput="famLoanDraft.amount=+this.value||0" placeholder="0.00" style="width:${Math.max(120,String(l.amount||'').length*36+40)}px"></div>
+    </div>
+    <div class="f-group">
+      <div class="f-lab">Lender (who gave)</div>
+      <div class="mem-pick">
+        ${state.members.map(m=>`<button class="${m.id===l.lender?'act':''}" onclick="famLoanDraft.lender='${m.id}';renderFamilyLoanModal()">
+          <span class="av">${memInitial(m.name)}</span><span class="nm">${escapeHTML(m.name.split(' ')[0])}</span>
+        </button>`).join('')}
+      </div>
+    </div>
+    <div class="f-group">
+      <div class="f-lab">Borrower (who received)</div>
+      <div class="mem-pick">
+        ${state.members.filter(m=>m.id!==l.lender).map(m=>`<button class="${m.id===l.borrower?'act':''}" onclick="famLoanDraft.borrower='${m.id}';renderFamilyLoanModal()">
+          <span class="av">${memInitial(m.name)}</span><span class="nm">${escapeHTML(m.name.split(' ')[0])}</span>
+        </button>`).join('')}
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Date</label><input type="date" value="${l.date}" oninput="famLoanDraft.date=this.value"></div>
+      <div class="field"><label>Paid back so far</label><input type="number" step="0.01" value="${l.paid||0}" oninput="famLoanDraft.paid=+this.value||0;renderFamilyLoanModal()"></div>
+    </div>
+    <div class="field"><label>Purpose</label><input value="${escapeHTML(l.purpose||'')}" oninput="famLoanDraft.purpose=this.value" placeholder="Phone bill, fuel, emergency..."></div>
+    <div class="field"><label>Note (optional)</label><textarea oninput="famLoanDraft.note=this.value">${escapeHTML(l.note||'')}</textarea></div>
+    ${remain>0?`<button class="secondary-btn" onclick="settleFamilyLoan()" style="margin-bottom:8px">Mark fully paid</button>`:''}
+    <div class="modal-actions">
+      ${l.id?`<button class="danger-btn" style="margin:0" onclick="deleteFamilyLoan()">Delete</button>`:''}
+      <button class="secondary-btn" onclick="closeModal()">Cancel</button>
+      <button class="primary-btn" onclick="saveFamilyLoan()">Save</button>
+    </div>
+  `);
+}
+function settleFamilyLoan(){famLoanDraft.paid=+famLoanDraft.amount||0;renderFamilyLoanModal()}
+function saveFamilyLoan(){
+  const l=famLoanDraft;
+  if(!l.amount||+l.amount<=0){toast('Enter amount');return}
+  if(!l.lender||!l.borrower||l.lender===l.borrower){toast('Pick different lender and borrower');return}
+  state.familyLoans=state.familyLoans||[];
+  const remain=(+l.amount||0)-(+l.paid||0);
+  l.status = remain<=0 ? 'paid' : 'active';
+  if(l.id){const i=state.familyLoans.findIndex(x=>x.id===l.id);state.familyLoans[i]={...l}}
+  else state.familyLoans.push({...l,id:uid('fl')});
+  saveState();closeModal();rerenderAll();toast('Saved');
+}
+function deleteFamilyLoan(){
+  const i=(state.familyLoans||[]).findIndex(x=>x.id===famLoanDraft.id);
+  if(i>=0){state.familyLoans.splice(i,1);saveState();closeModal();rerenderAll();toast('Deleted')}
+}
+
+/* ============== SHARE WITH FAMILY MODAL ============== */
+let shareDraftEmails={}; // {memberId: email-being-typed}
+let shareStatus={};      // {memberId: 'idle'|'sharing'|'shared'|'error'|'already-shared'}
+async function openShareWithFamily(){
+  if(session.mode!=='cloud'){toast('Connect to Drive first');return}
+  if(!driveFileId){toast('No Drive file yet — log a transaction first');return}
+  shareDraftEmails={};
+  state.meta.familyEmails=state.meta.familyEmails||{};
+  // pre-populate draft emails from saved state
+  state.members.forEach(m=>{
+    if(state.meta.familyEmails[m.id]) shareDraftEmails[m.id]=state.meta.familyEmails[m.id].email||'';
+  });
+  // Pull current permissions so we know who already has access
+  shareStatus={};
+  state.members.forEach(m=>{shareStatus[m.id]='loading'});
+  renderShareModal();
+  try{
+    const perms=await listFilePermissions(driveFileId);
+    const sharedEmails=new Set(perms.filter(p=>p.role==='writer'||p.role==='reader').map(p=>(p.emailAddress||'').toLowerCase()));
+    state.members.forEach(m=>{
+      const e=(state.meta.familyEmails?.[m.id]?.email||'').toLowerCase();
+      shareStatus[m.id] = (e && sharedEmails.has(e)) ? 'already-shared' : 'idle';
+    });
+  }catch(err){
+    console.error('Failed to list permissions',err);
+    state.members.forEach(m=>{shareStatus[m.id]='idle'});
+  }
+  renderShareModal();
+}
+function renderShareModal(){
+  openModal(`
+    <div class="modal-hd"><h3>Share with family</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:14px;line-height:1.5">Enter each family member's Gmail address. They'll get an email invite, then sign in to <em style="color:var(--p-gold,var(--gold));font-style:italic">vidhuvaru.vercel.app</em> with that Gmail to access the shared family data.</p>
+    <div style="background:rgba(212,165,116,.06);border:1px solid rgba(212,165,116,.2);border-radius:12px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--fg-2);line-height:1.5">
+      <strong style="color:var(--p-gold,var(--gold))">Note:</strong> Only Gmail addresses. They'll see a "Google hasn't verified Vidhuvaru" warning on first sign-in — that's normal for our private app. Tap Advanced → Continue.
+    </div>
+    ${state.members.map(m=>{
+      const s=shareStatus[m.id]||'idle';
+      const e=shareDraftEmails[m.id]||'';
+      const saved=state.meta.familyEmails?.[m.id]?.email||'';
+      let badge='', btnLabel='Share', btnDisabled='';
+      if(s==='loading'){badge='<span style="color:var(--fg-3);font-size:10px;font-family:var(--font-mono)">checking…</span>';btnDisabled='disabled'}
+      else if(s==='sharing'){badge='<span style="color:var(--p-gold,var(--gold));font-size:10px;font-family:var(--font-mono)">sharing…</span>';btnDisabled='disabled';btnLabel='…'}
+      else if(s==='shared'){badge='<span style="color:var(--green-400);font-size:10px;font-family:var(--font-mono);font-weight:700">✓ SHARED</span>';btnLabel='Re-share';}
+      else if(s==='already-shared'){badge='<span style="color:var(--green-400);font-size:10px;font-family:var(--font-mono);font-weight:700">✓ ALREADY SHARED</span>';btnLabel='Re-share';}
+      else if(s==='error'){badge='<span style="color:var(--red-400);font-size:10px;font-family:var(--font-mono)">failed</span>'}
+      return `<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:12px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          <div class="pm-av" style="width:30px;height:30px;font-size:13px">${memInitial(m.name)}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--fg);letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(m.name.split(' ').slice(0,2).join(' '))}</div>
+            <div style="font-size:10px;color:var(--fg-3);font-family:var(--font-mono)">${escapeHTML(m.role)}</div>
+          </div>
+          ${badge}
+        </div>
+        <div style="display:flex;gap:6px">
+          <input type="email" placeholder="${escapeHTML(m.name.toLowerCase().split(' ')[0])}@gmail.com" value="${escapeHTML(e)}"
+            oninput="shareDraftEmails['${m.id}']=this.value;shareStatus['${m.id}']='idle'"
+            style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:9px;padding:8px 10px;color:var(--fg);font-family:var(--font-mono);font-size:12px">
+          <button onclick="doShareWithMember('${m.id}')" ${btnDisabled} style="background:${s==='shared'||s==='already-shared'?'rgba(94,200,140,.16)':'color-mix(in oklab,var(--p-gold) 14%, transparent)'};color:${s==='shared'||s==='already-shared'?'var(--green-400)':'var(--p-gold)'};border:1px solid ${s==='shared'||s==='already-shared'?'rgba(94,200,140,.3)':'color-mix(in oklab,var(--p-gold) 35%, transparent)'};padding:8px 14px;border-radius:9px;font-weight:600;font-size:12px;cursor:pointer;${btnDisabled?'opacity:.5':''}">${btnLabel}</button>
+        </div>
+      </div>`;
+    }).join('')}
+    <button class="secondary-btn" onclick="shareAllWithFamily()" style="margin-top:6px;background:color-mix(in oklab,var(--p-gold) 14%, transparent);color:var(--p-gold);border:1px solid color-mix(in oklab,var(--p-gold) 35%, transparent);font-weight:700">⇄ Share with all who have emails</button>
+    <div class="modal-actions">
+      <button class="primary-btn" onclick="closeModal()">Done</button>
+    </div>
+  `);
+}
+async function doShareWithMember(memberId){
+  const email=(shareDraftEmails[memberId]||'').trim();
+  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){toast('Enter a valid email');return}
+  shareStatus[memberId]='sharing';renderShareModal();
+  try{
+    await shareFileWithEmail(driveFileId, email);
+    state.meta.familyEmails=state.meta.familyEmails||{};
+    state.meta.familyEmails[memberId]={email,sharedAt:new Date().toISOString()};
+    saveState();
+    shareStatus[memberId]='shared';
+    renderShareModal();
+    toast('Shared ✓');
+  }catch(err){
+    console.error('Share failed',err);
+    shareStatus[memberId]='error';
+    renderShareModal();
+    toast('Share failed — check the email');
+  }
+}
+async function shareAllWithFamily(){
+  let n=0,f=0;
+  for(const m of state.members){
+    const email=(shareDraftEmails[m.id]||'').trim();
+    if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))continue;
+    if(shareStatus[m.id]==='shared'||shareStatus[m.id]==='already-shared')continue;
+    shareStatus[m.id]='sharing';renderShareModal();
+    try{
+      await shareFileWithEmail(driveFileId,email);
+      state.meta.familyEmails=state.meta.familyEmails||{};
+      state.meta.familyEmails[m.id]={email,sharedAt:new Date().toISOString()};
+      shareStatus[m.id]='shared';n++;
+    }catch(err){shareStatus[m.id]='error';f++}
+    renderShareModal();
+  }
+  saveState();
+  toast(`Shared with ${n}${f?', '+f+' failed':''}`);
+}
 
 /* ============== BUDGET MODAL ============== */
 function openBudget(category){
@@ -2405,16 +2956,18 @@ function renderSigninExisting(){
   panel.innerHTML=`
     <div class="who">Continue as</div>
     <div class="signin-existing">
-      ${ordered.map(m=>`
-        <button class="se-row" onclick="continueAsMember('${m.id}')">
+      ${ordered.map(m=>{
+        const noPin = !m.pin;
+        const firstTwo = m.name.split(' ').slice(0,2).join(' ');
+        return `<button class="se-row" onclick="continueAsMember('${m.id}')">
           <div class="se-av">${memInitial(m.name)}</div>
           <div class="se-info">
-            <div class="se-nm">${escapeHTML(m.name)}${m.id===lastId?' <span class="badge">Last</span>':''}</div>
+            <div class="se-nm">${escapeHTML(firstTwo)}${m.id===lastId?' <span class="badge">Last</span>':''}${noPin?' <span class="badge" style="background:transparent;color:var(--p-gold,var(--gold));border:1px solid color-mix(in oklab,var(--p-gold) 45%,transparent)">SET PIN</span>':''}</div>
             <div class="se-sub">${escapeHTML(m.role)}${m.workplace?' · '+escapeHTML(m.workplace):''}</div>
           </div>
           <div class="se-chev">›</div>
-        </button>
-      `).join('')}
+        </button>`;
+      }).join('')}
     </div>
     ${cachedEmail?`<div class="se-acc">Google · ${escapeHTML(cachedEmail)}</div>`:''}
     <div class="se-or"><span>or use a different Google account</span></div>
@@ -2427,7 +2980,8 @@ function continueAsMember(id){
   if(!m){toast('Member not found');return}
   // Route to PIN screen for this member
   pinSelectedMemberId=id;
-  pinDraft='';
+  pinDraft='';pinFirstHalf='';
+  pinMode = m.pin ? 'enter' : 'set';
   // Decide mode: if we have a valid cached token, we're cloud-mode; otherwise local with background reconnect
   const cached=lsGet('gtoken');
   if(cached && cached.e>Date.now()+30000){
