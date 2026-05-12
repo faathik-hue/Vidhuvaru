@@ -222,10 +222,55 @@
   .pin-err{color:var(--red-400);font-size:12px;margin-top:10px;min-height:16px}
   .pin-skip{margin-top:14px;color:var(--fg-3);font-size:12px;text-decoration:underline}
 
+  /* === WAITING-FOR-ACCESS SCREEN === */
+  #waiting,#repair{padding:32px 20px;align-items:center;justify-content:center;
+    background:radial-gradient(140% 90% at 50% 100%,#1a2c4d 0%,#0f1d36 55%,#0c1a30 100%)}
+  .waiting-card,.repair-card{background:rgba(20,23,29,.62);backdrop-filter:blur(20px);
+    -webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.07);
+    border-radius:var(--r-xl);padding:28px 22px;width:100%;max-width:380px;text-align:center}
+  .waiting-icon,.repair-icon{font-size:44px;margin-bottom:10px;line-height:1}
+  .waiting-card h2,.repair-card h2{font-family:var(--font-serif);font-size:24px;margin-bottom:8px;
+    font-weight:500;letter-spacing:-.02em}
+  .waiting-sub,.repair-sub{color:var(--fg-2);font-size:13px;line-height:1.5;margin-bottom:18px}
+  .repair-sub code{font-family:var(--font-mono);font-size:11px;background:rgba(255,255,255,.05);
+    padding:1px 5px;border-radius:4px}
+  .waiting-email-box{background:rgba(212,165,116,.05);border:1px solid rgba(212,165,116,.18);
+    border-radius:var(--r-md);padding:14px;margin-bottom:18px}
+  .waiting-email-label{font-size:10px;letter-spacing:.12em;color:var(--fg-3);margin-bottom:6px;font-weight:600}
+  .waiting-email{font-family:var(--font-mono);font-size:14px;color:var(--gold);word-break:break-all;font-weight:500}
+  .waiting-actions{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+  .secondary-btn{display:block;width:100%;padding:13px;background:rgba(255,255,255,.05);
+    color:var(--fg);border:1px solid rgba(255,255,255,.08);border-radius:var(--r-md);
+    font-size:14px;font-weight:500;cursor:pointer;transition:background .15s}
+  .secondary-btn:active{background:rgba(255,255,255,.09)}
+  .ghost-btn{display:block;width:100%;padding:11px;background:transparent;color:var(--fg-2);
+    border:none;font-size:12px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+  .ghost-btn:active{color:var(--fg)}
+  .waiting-divider{position:relative;text-align:center;margin:14px 0 10px;color:var(--fg-3);font-size:11px}
+  .waiting-divider::before,.waiting-divider::after{content:"";position:absolute;top:50%;width:38%;
+    height:1px;background:rgba(255,255,255,.07)}
+  .waiting-divider::before{left:0}.waiting-divider::after{right:0}
+  .waiting-divider span{background:rgba(20,23,29,.62);padding:0 8px;position:relative}
+  .waiting-alt{display:flex;flex-direction:column;gap:2px}
+
+  /* === REPAIR SCREEN === */
+  .repair-file{display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(255,255,255,.03);
+    border:1px solid rgba(255,255,255,.06);border-radius:var(--r-md);margin-bottom:8px;text-align:left}
+  .repair-file.primary{border-color:rgba(94,200,140,.4);background:rgba(94,200,140,.05)}
+  .repair-file .rf-info{flex:1;min-width:0}
+  .repair-file .rf-owner{font-size:13px;font-weight:600;color:var(--fg);margin-bottom:3px}
+  .repair-file .rf-meta{font-size:11px;color:var(--fg-3);font-family:var(--font-mono)}
+  .repair-file .rf-badge{display:inline-block;font-size:9px;letter-spacing:.06em;
+    padding:2px 6px;border-radius:6px;margin-left:6px;font-weight:600;text-transform:uppercase}
+  .repair-file .rf-badge.shared{background:rgba(94,200,140,.18);color:#5ec88c}
+  .repair-file .rf-badge.owned{background:rgba(212,165,116,.18);color:var(--gold)}
+  .repair-actions{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+
   /* === MAIN APP === */
   #main{padding-bottom:104px}
   .topbar{position:sticky;top:0;z-index:50;
-    display:flex;align-items:center;gap:12px;padding:14px 18px 10px;
+    display:flex;align-items:center;gap:12px;
+    padding:calc(14px + env(safe-area-inset-top,0px)) 18px 10px;
     background:rgba(15,29,54,.6);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
     border-bottom:1px solid rgba(255,255,255,.04)}
   .tb-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0;
@@ -562,6 +607,23 @@
   .nlp-btn{padding:8px 16px;background:var(--fg);color:#1a1410;
     border-radius:999px;font-size:11px;font-weight:700;border:none;cursor:pointer;letter-spacing:-.01em}
   .nlp-btn:active{transform:scale(.96)}
+  .nlp-tabs{display:flex;gap:6px;margin-bottom:10px;background:rgba(8,9,12,.4);padding:3px;
+    border-radius:999px;border:1px solid rgba(255,255,255,.06)}
+  .nlp-tab{flex:1;padding:7px 10px;background:transparent;color:var(--fg-2);font-size:11px;
+    font-weight:600;border:none;border-radius:999px;cursor:pointer;transition:background .15s}
+  .nlp-tab.act{background:rgba(212,165,116,.18);color:var(--p-gold,var(--gold))}
+  .photo-zone{margin-top:4px}
+  .photo-pick{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:24px 14px;background:rgba(8,9,12,.5);border:1.5px dashed rgba(212,165,116,.28);
+    border-radius:var(--r-sm);cursor:pointer;text-align:center;transition:border-color .15s}
+  .photo-pick:active{border-color:rgba(212,165,116,.55)}
+  .photo-pick-ic{font-size:34px;margin-bottom:8px;line-height:1}
+  .photo-pick-lab{font-size:13px;color:var(--fg);font-weight:600;margin-bottom:4px}
+  .photo-pick-sub{font-size:11px;color:var(--fg-3);line-height:1.4}
+  .photo-preview{position:relative;border-radius:var(--r-sm);overflow:hidden;
+    border:1px solid rgba(255,255,255,.06);background:#000;max-height:240px;display:flex;
+    align-items:center;justify-content:center}
+  .photo-preview img{max-width:100%;max-height:240px;object-fit:contain}
 
   /* Type toggle in tx modal */
   .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:0;
@@ -626,6 +688,13 @@
   .mem-pick button .nm{font-size:13px;font-weight:600;color:var(--fg-1);letter-spacing:-.01em}
   .mem-pick button.act{background:color-mix(in oklab,var(--p-gold) 14%,transparent);border-color:color-mix(in oklab,var(--p-gold) 35%,transparent)}
   .mem-pick button.act .nm{color:var(--fg)}
+  .mem-select{width:100%;padding:11px 12px;background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.07);border-radius:var(--r-sm);
+    color:var(--fg);font-size:13.5px;font-weight:500;cursor:pointer;
+    appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23c9a84c' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 14px center;padding-right:34px}
+  .mem-select:focus{outline:none;border-color:rgba(212,165,116,.4)}
 
   /* Modal actions */
   .modal-actions{display:flex;gap:8px;margin-top:18px}
@@ -747,8 +816,8 @@
         <div class="feat"><div class="ico">👨‍👩‍👧‍👦</div><div class="lab">Family sync</div><div class="val">Up to 8 members</div></div>
         <div class="feat"><div class="ico">🏠</div><div class="lab">Two houses</div><div class="val">Hiya &amp; Vidhuvaru</div></div>
         <div class="feat"><div class="ico">💵</div><div class="lab">Multi-currency</div><div class="val">MVR + USD</div></div>
-        <div class="feat"><div class="ico">✨</div><div class="lab">Smart add</div><div class="val">Type naturally</div></div>
-        <div class="feat"><div class="ico">📲</div><div class="lab">BML import</div><div class="val">Paste &amp; parse</div></div>
+        <div class="feat"><div class="ico">✨</div><div class="lab">Smart add</div><div class="val">Type, paste, snap</div></div>
+        <div class="feat"><div class="ico">📸</div><div class="lab">Photo capture</div><div class="val">Scan receipts</div></div>
         <div class="feat"><div class="ico">🔒</div><div class="lab">PIN locked</div><div class="val">Private profiles</div></div>
       </div>
 
@@ -791,6 +860,44 @@
     </div>
   </div>
 
+  <!-- WAITING FOR ACCESS (family member signed in, no shared file yet) -->
+  <div id="waiting" class="screen">
+    <div class="waiting-card">
+      <div class="waiting-icon">📬</div>
+      <h2>Waiting for Faathik to share</h2>
+      <p class="waiting-sub">Tell him to add <em>your</em> Gmail to Vidhuvaru. Once he shares, your data will appear automatically.</p>
+      <div class="waiting-email-box">
+        <div class="waiting-email-label">YOUR EMAIL</div>
+        <div class="waiting-email" id="waitingEmail">—</div>
+      </div>
+      <div class="waiting-actions">
+        <button class="primary-btn" id="waitingCopyBtn" onclick="copyWaitingEmail()">📋 Copy email</button>
+        <button class="secondary-btn" onclick="shareWaitingEmailWhatsApp()">💬 Send to Faathik on WhatsApp</button>
+      </div>
+      <div class="waiting-divider"><span>or</span></div>
+      <div class="waiting-alt">
+        <button class="ghost-btn" onclick="retryWaiting()">🔄 I've been added — check again</button>
+        <button class="ghost-btn" onclick="iAmHead()">I'm Faathik / Head of family</button>
+        <button class="ghost-btn" onclick="signOutFromWaiting()">Sign out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPAIR (multiple Drive files found) -->
+  <div id="repair" class="screen">
+    <div class="repair-card">
+      <div class="repair-icon">⚠️</div>
+      <h2>Multiple data files found</h2>
+      <p class="repair-sub">There's more than one <code>vidhuvaru-data.json</code> in your Drive. Usually this means someone in the family created a separate copy by accident. Let's merge them into one.</p>
+      <div id="repairList"></div>
+      <div class="repair-actions">
+        <button class="primary-btn" onclick="mergeOrphanFiles()">🔀 Merge all into one</button>
+        <button class="ghost-btn" onclick="pickRepairFile(0)">Just use the top one</button>
+        <button class="ghost-btn" onclick="signOutFromRepair()">Sign out</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MAIN APP -->
   <div id="main" class="screen">
     <div class="topbar">
@@ -806,9 +913,6 @@
         <span class="tb-chev">▾</span>
       </div>
       <div class="tb-actions">
-        <button class="tb-ic" onclick="openBml()" aria-label="Import BML notification" title="Import BML notification">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
-        </button>
         <button class="tb-ic" onclick="openTx()" aria-label="Add">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         </button>
@@ -847,6 +951,8 @@
 <div class="modal-bg" id="modalBg"><div class="modal" id="modalContent"></div></div>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- Tesseract.js for on-device OCR — loaded lazily on first Photo tab open -->
+<script>window.__tesseractLoader=function(){if(window.Tesseract)return Promise.resolve(window.Tesseract);if(window.__tesseractPromise)return window.__tesseractPromise;window.__tesseractPromise=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=()=>res(window.Tesseract);s.onerror=()=>rej(new Error('Failed to load OCR engine'));document.head.appendChild(s)});return window.__tesseractPromise};</script>
 
 <script>
 /* ============================================================
@@ -862,7 +968,7 @@ const DATA_FILE='vidhuvaru-data.json';
 const LS='vidhuvaru:';
 const SYNC_DELAY=3000;
 const RETRY_DELAY=30000;
-const VERSION='4.8';
+const VERSION='4.9';
 const DEFAULT_FX=15.42; // MVR per 1 USD (Maldivian pegged rate)
 
 // Pre-seeded family member names (used in setup screen as defaults)
@@ -899,6 +1005,7 @@ const CATEGORIES=[
   {name:'Entertainment',icon:'🎬',color:'#6a4c93'},
   {name:'Travel',icon:'✈️',color:'#4a90d9'},
   {name:'Salary',icon:'💼',color:'#4caf7d'},
+  {name:'Subscriptions',icon:'🔁',color:'#9b6dff'},
   {name:'Other',icon:'📦',color:'#999'}
 ];
 const ROLES=['Head','Spouse','Son','Daughter','Brother','Sister','Father','Mother','Other'];
@@ -940,7 +1047,7 @@ function applyTheme(palette,density,mood){
 
 /* ============== STATE ============== */
 let state={
-  members:[], expenses:[], loans:[], savings:[], accounts:[], budgets:[], familyLoans:[],
+  members:[], expenses:[], loans:[], savings:[], accounts:[], budgets:[], familyLoans:[], subscriptions:[],
   meta:{last_modified:null,version:VERSION,familyName:'Vidhuvaru',fxRate:DEFAULT_FX,createdAt:null,theme:{palette:'midnight',density:'regular',mood:'bold'}}
 };
 let session={ currentMember:null, googleToken:null, tokenExpiry:0, mode:'local', // 'local'|'cloud'
@@ -999,11 +1106,13 @@ function migrate(s){
     }
   }
   if(!Array.isArray(s.familyLoans))s.familyLoans=[];
+  // v4.8 → v4.9: subscriptions array
+  if(!Array.isArray(s.subscriptions))s.subscriptions=[];
   s.meta=s.meta||{};
   s.meta.version=VERSION;
   return s;
 }
-function loadState(){const s=lsGet('state');if(s){migrate(s);state=Object.assign(state,s)}if(!state.meta.fxRate)state.meta.fxRate=DEFAULT_FX;if(!state.meta.version)state.meta.version=VERSION;if(!Array.isArray(state.familyLoans))state.familyLoans=[]}
+function loadState(){const s=lsGet('state');if(s){migrate(s);state=Object.assign(state,s)}if(!state.meta.fxRate)state.meta.fxRate=DEFAULT_FX;if(!state.meta.version)state.meta.version=VERSION;if(!Array.isArray(state.familyLoans))state.familyLoans=[];if(!Array.isArray(state.subscriptions))state.subscriptions=[]}
 
 /* ============== GOOGLE AUTH ============== */
 let tokenClient=null;
@@ -1062,14 +1171,27 @@ async function driveFetch(url,opts={}){
   return r;
 }
 async function findDriveFile(){
+  // Get all files with ownership info so we can prefer SHARED files over owned files
+  // (Critical: a family member who signs in for the first time should find the head's
+  //  shared file, not accidentally create a new orphan one in their own Drive.)
   const q=encodeURIComponent(`name='${DATA_FILE}' and trashed=false`);
-  const r=await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc`);
+  const r=await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime,createdTime,ownedByMe,owners(emailAddress,displayName),sharedWithMeTime,size)&orderBy=modifiedTime desc`);
   const j=await r.json();
   if(!j.files||!j.files.length)return null;
-  // pick the newest; remember if there are duplicates
+  // Stash ALL candidates so the UI can show them for repair/merge
+  session.allDriveFiles=j.files;
   session.duplicateFileCount=j.files.length;
-  session.duplicateFileIds=j.files.slice(1).map(f=>f.id);
-  return j.files[0];
+  // PREFER shared files (head's file) over our own (likely orphan).
+  // Within each group, prefer the largest (most data), then newest.
+  const sharedFiles=j.files.filter(f=>!f.ownedByMe);
+  const ownedFiles=j.files.filter(f=>f.ownedByMe);
+  const scoreFile=(f)=>(+(f.size||0))*1000 + (new Date(f.modifiedTime).getTime()/1e10);
+  sharedFiles.sort((a,b)=>scoreFile(b)-scoreFile(a));
+  ownedFiles.sort((a,b)=>scoreFile(b)-scoreFile(a));
+  // If there's a shared file, that's our primary. Owned ones become "duplicates" we may want to merge/delete.
+  const ordered=sharedFiles.length>0 ? [...sharedFiles, ...ownedFiles] : [...ownedFiles];
+  session.duplicateFileIds=ordered.slice(1).map(f=>f.id);
+  return ordered[0];
 }
 async function deleteDriveFile(id){
   return driveFetch(`https://www.googleapis.com/drive/v3/files/${id}`,{method:'DELETE'});
@@ -1183,7 +1305,7 @@ function updateSyncDot(s){
 
 /* ============== SCREEN ROUTING ============== */
 function show(id){
-  ['signin','loading','setup','login','main'].forEach(s=>{const el=$(s);if(el)el.classList.remove('active')});
+  ['signin','loading','setup','login','waiting','repair','main'].forEach(s=>{const el=$(s);if(el)el.classList.remove('active')});
   $(id).classList.add('active');
   window.scrollTo(0,0);
 }
@@ -1212,13 +1334,41 @@ async function onSignedIn(){
   const cachedEmail=lsGet('googleEmail');
   if(cachedEmail)session.googleEmail=cachedEmail;
   const result=await pullFromDrive();
+
+  // SCENARIO A: Found a shared file from the head + local has no members → use the shared one as primary
+  // SCENARIO B: Found multiple files (e.g. user has both shared + orphan) → trigger repair UI
+  // SCENARIO C: No file found at all + local has no members → "Waiting for access" (don't create orphan)
+  // SCENARIO D: Normal — found single file, all good
+
+  const multipleFiles = (session.allDriveFiles||[]).length > 1;
+  if(multipleFiles && state.members.length===0){
+    // Don't auto-pick — let user repair
+    show('repair');
+    renderRepairScreen();
+    return;
+  }
   if(result.found && state.members.length>0){
     afterDataReady();
   }else if(state.members.length>0){
-    $('loadingStatus').textContent='Backing up your data…';
-    await pushToDrive();
-    afterDataReady();
+    // Local has data but Drive doesn't. Could be: head's first push, OR orphan we're about to create.
+    // If the user is signing in with a NEW email and no shared file exists, this would create an orphan.
+    // Only push if there are NO other files anywhere (this is a genuinely new install or a head).
+    if((session.allDriveFiles||[]).length===0){
+      $('loadingStatus').textContent='Backing up your data…';
+      await pushToDrive();
+      afterDataReady();
+    }else{
+      // Files exist somewhere but pull didn't apply them. Show repair.
+      show('repair');
+      renderRepairScreen();
+    }
+  }else if((session.allDriveFiles||[]).length===0){
+    // No files anywhere and no local data. Could be: first-time head OR family member waiting for share.
+    // Show a choice screen.
+    show('waiting');
+    renderWaitingScreen();
   }else{
+    // Catch-all — go to setup
     initSetup();
     show('setup');
   }
@@ -1227,7 +1377,212 @@ function useLocal(){
   session.mode='local';
   if(state.members.length>0){afterDataReady()}else{initSetup();show('setup')}
 }
+
+/* ============== WAITING-FOR-ACCESS SCREEN ============== */
+function renderWaitingScreen(){
+  const email = session.googleEmail || lsGet('googleEmail') || '(getting your email…)';
+  $('waitingEmail').textContent = email;
+  // try fetching userinfo if we don't have it yet
+  if(!session.googleEmail){fetchGoogleUserinfo().then(()=>{const e=session.googleEmail;if(e)$('waitingEmail').textContent=e})}
+}
+function copyWaitingEmail(){
+  const email = session.googleEmail || $('waitingEmail').textContent;
+  if(!email||email==='—'){toast('No email loaded yet');return}
+  navigator.clipboard.writeText(email).then(()=>{
+    const btn=$('waitingCopyBtn');const orig=btn.textContent;
+    btn.textContent='✓ Copied';btn.style.background='var(--green-400,#5ec88c)';
+    setTimeout(()=>{btn.textContent=orig;btn.style.background=''},1400);
+  }).catch(()=>toast('Copy failed'));
+}
+function shareWaitingEmailWhatsApp(){
+  const email = session.googleEmail || $('waitingEmail').textContent;
+  if(!email||email==='—'){toast('No email loaded yet');return}
+  const txt = encodeURIComponent(`Hi Faathik, please share Vidhuvaru with me. My email is ${email}`);
+  window.open(`https://wa.me/?text=${txt}`,'_blank');
+}
+async function retryWaiting(){
+  show('loading');
+  $('loadingStatus').textContent='Checking again…';
+  await onSignedIn();
+}
+function iAmHead(){
+  // User is the head — they don't have a shared file because they ARE the source.
+  // Go to setup so they can pre-seed the family.
+  if(!confirm('Only do this if you are Faathik (head of family) and this is your first time setting up Vidhuvaru. Continue?'))return;
+  initSetup();
+  show('setup');
+}
+function signOutFromWaiting(){
+  if(!confirm('Sign out of Google?'))return;
+  signOutGoogle();
+}
+
+/* ============== REPAIR SCREEN ============== */
+function renderRepairScreen(){
+  const files = session.allDriveFiles || [];
+  const list = $('repairList');
+  list.innerHTML='';
+  if(!files.length){list.innerHTML='<div style="text-align:center;color:var(--fg-3);font-size:13px;padding:20px">No files found.</div>';return}
+  files.forEach((f,i)=>{
+    const owner = (f.owners && f.owners[0]) || {};
+    const ownerName = owner.displayName || owner.emailAddress || (f.ownedByMe?'You':'Unknown');
+    const ownerEmail = owner.emailAddress || '';
+    const sizeKb = f.size ? Math.round((+f.size)/1024) : 0;
+    const dt = f.modifiedTime ? new Date(f.modifiedTime).toLocaleString() : '';
+    const badge = f.ownedByMe
+      ? '<span class="rf-badge owned">Your file</span>'
+      : '<span class="rf-badge shared">Shared with you</span>';
+    const primaryBadge = i===0 ? '<span class="rf-badge shared" style="background:rgba(212,165,116,.18);color:var(--gold)">Primary</span>' : '';
+    const row = document.createElement('div');
+    row.className = 'repair-file' + (i===0?' primary':'');
+    row.innerHTML = `
+      <div class="rf-info">
+        <div class="rf-owner">${escapeHTML(ownerName)} ${badge}${primaryBadge}</div>
+        <div class="rf-meta">${ownerEmail?escapeHTML(ownerEmail)+' · ':''}${sizeKb}KB · ${escapeHTML(dt)}</div>
+      </div>
+      <button class="ghost-btn" style="width:auto;padding:6px 10px;background:rgba(255,255,255,.05);text-decoration:none;border-radius:8px;font-size:11px" onclick="pickRepairFile(${i})">Use this</button>
+    `;
+    list.appendChild(row);
+  });
+}
+async function pickRepairFile(idx){
+  const files = session.allDriveFiles || [];
+  if(!files[idx]){toast('Invalid choice');return}
+  const chosen = files[idx];
+  show('loading');
+  $('loadingStatus').textContent='Loading chosen file…';
+  driveFileId = chosen.id;
+  try{
+    const data = await readDriveFile(chosen.id);
+    if(data && typeof data==='object'){
+      Object.assign(state, migrate(data));
+      saveState();
+      // delete the others
+      const others = files.filter((_,i)=>i!==idx);
+      if(others.length && confirm(`Delete the other ${others.length} duplicate file${others.length>1?'s':''} from your Drive?`)){
+        for(const f of others){try{await deleteDriveFile(f.id)}catch(e){console.error(e)}}
+      }
+      session.lastSync = new Date().toISOString();
+      updateSyncDot('synced');
+      afterDataReady();
+    }else{
+      toast('File looks empty');
+      show('repair');
+    }
+  }catch(e){
+    console.error(e);
+    toast('Couldn\'t load that file');
+    show('repair');
+  }
+}
+async function mergeOrphanFiles(){
+  const files = session.allDriveFiles || [];
+  if(files.length<2){toast('Nothing to merge');return}
+  if(!confirm(`Merge data from all ${files.length} files into one? Duplicates will be skipped.`))return;
+  show('loading');
+  $('loadingStatus').textContent='Reading all files…';
+  const datas = [];
+  for(const f of files){
+    try{
+      const d = await readDriveFile(f.id);
+      if(d && typeof d==='object'){datas.push({file:f,data:migrate(d)})}
+    }catch(e){console.error('Failed to read',f.id,e)}
+  }
+  if(!datas.length){toast('Couldn\'t read any file');show('repair');return}
+  $('loadingStatus').textContent='Merging…';
+  // Pick primary: prefer shared file, else file with most data
+  let primary = datas.find(d=>!d.file.ownedByMe);
+  if(!primary){
+    primary = datas.slice().sort((a,b)=>(b.data.expenses?.length||0)-(a.data.expenses?.length||0))[0];
+  }
+  const merged = mergeStates(datas.map(d=>d.data), primary.data);
+  // Save merged data into primary file
+  driveFileId = primary.file.id;
+  Object.assign(state, merged);
+  saveState();
+  try{
+    await patchDriveFile(primary.file.id, state);
+    // delete others
+    for(const d of datas){
+      if(d.file.id===primary.file.id)continue;
+      try{await deleteDriveFile(d.file.id)}catch(e){console.error('Delete failed',e)}
+    }
+    session.lastSync = new Date().toISOString();
+    updateSyncDot('synced');
+    toast(`✓ Merged ${datas.length} files into one`);
+    afterDataReady();
+  }catch(e){
+    console.error(e);
+    toast('Merge save failed');
+    show('repair');
+  }
+}
+/* Combines arrays of state objects, deduping by id. Primary is the base. */
+function mergeStates(allStates, primary){
+  const result = JSON.parse(JSON.stringify(primary));
+  // dedup helper: keep first occurrence by id
+  const dedupById = (arr)=>{
+    const seen = new Set();
+    return arr.filter(x=>{
+      if(!x||!x.id)return false;
+      if(seen.has(x.id))return false;
+      seen.add(x.id);return true;
+    });
+  };
+  // merge expenses (by id)
+  let allExpenses = [];
+  allStates.forEach(s=>{if(Array.isArray(s.expenses))allExpenses=allExpenses.concat(s.expenses)});
+  result.expenses = dedupById(allExpenses);
+  // merge members by NAME (case-insensitive) — names are seeded the same
+  const memMap = new Map();
+  // primary first so its ids win
+  (primary.members||[]).forEach(m=>{memMap.set((m.name||'').toLowerCase().trim(), m)});
+  allStates.forEach(s=>{(s.members||[]).forEach(m=>{
+    const k=(m.name||'').toLowerCase().trim();
+    if(!memMap.has(k))memMap.set(k,m);
+  })});
+  result.members = Array.from(memMap.values());
+  // accounts: by id
+  let allAccts = [];
+  allStates.forEach(s=>{if(Array.isArray(s.accounts))allAccts=allAccts.concat(s.accounts)});
+  result.accounts = dedupById(allAccts);
+  // savings, loans, familyLoans, budgets, subscriptions: by id
+  ['savings','loans','familyLoans','budgets','subscriptions'].forEach(key=>{
+    let all=[];
+    allStates.forEach(s=>{if(Array.isArray(s[key]))all=all.concat(s[key])});
+    if(all.length)result[key]=dedupById(all);
+  });
+  // meta: keep primary's meta, but union familyEmails
+  if(!result.meta)result.meta={};
+  const emailSet = new Set(result.meta.familyEmails||[]);
+  allStates.forEach(s=>{(s.meta&&s.meta.familyEmails||[]).forEach(e=>emailSet.add(e))});
+  result.meta.familyEmails = Array.from(emailSet);
+  return result;
+}
+function signOutFromRepair(){
+  if(!confirm('Sign out of Google?'))return;
+  signOutGoogle();
+}
+async function openRepairSync(){
+  if(session.mode!=='cloud'){toast('Sign in to Google first');return}
+  show('loading');
+  $('loadingStatus').textContent='Scanning your Drive…';
+  try{
+    await findDriveFile();
+  }catch(e){console.error(e);toast('Drive scan failed');show('main');return}
+  const files = session.allDriveFiles || [];
+  if(files.length<=1){
+    toast('No duplicate files found — sync looks healthy');
+    show('main');
+    return;
+  }
+  show('repair');
+  renderRepairScreen();
+}
+
 function afterDataReady(){
+  // Auto-create any pending subscription renewals before showing PIN
+  try{ checkSubscriptionRenewals(); }catch(e){console.error(e)}
   // Always show PIN screen — never auto-bypass on a shared family device.
   // initLogin() pre-selects the last member from cache for one-tap pick + PIN entry.
   initLogin();
@@ -1401,6 +1756,50 @@ function enterMain(){
   go('dashboard');
   // background pull on open if cloud
   if(session.mode==='cloud'){setTimeout(()=>pullFromDrive().then(r=>{if(r.applied)rerenderAll()}),800)}
+  // One-time Share-with-family prompt for Head when family isn't shared yet
+  setTimeout(maybePromptShare, 1400);
+}
+function maybePromptShare(){
+  if(session.mode!=='cloud')return;
+  if(!session.currentMember || session.currentMember.role!=='Head')return;
+  if(session.sharePromptShown)return;
+  if(lsGet('sharePromptDismissed'))return;
+  const sharedCount = state.meta?.familyEmails ? Object.keys(state.meta.familyEmails).length : 0;
+  const familySize = state.members.length;
+  // If 2+ family members haven't been added to share, prompt
+  if(sharedCount >= familySize - 1)return; // already mostly shared (excl. head themselves)
+  session.sharePromptShown = true;
+  showSharePromptBanner();
+}
+function showSharePromptBanner(){
+  const existing = document.getElementById('shareBanner');
+  if(existing)existing.remove();
+  const banner = document.createElement('div');
+  banner.id = 'shareBanner';
+  banner.innerHTML = `
+    <div style="background:linear-gradient(135deg,rgba(212,165,116,.12),rgba(212,165,116,.04));border:1px solid rgba(212,165,116,.28);
+      border-radius:18px;padding:14px 16px;margin:14px 18px 0;display:flex;gap:12px;align-items:center;
+      backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)">
+      <div style="font-size:26px;line-height:1;flex-shrink:0">📤</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--fg);margin-bottom:2px;letter-spacing:-.01em">Share with your family</div>
+        <div style="font-size:11px;color:var(--fg-2);line-height:1.4">Add each member's Gmail so they see the same data. Otherwise they'll create separate copies.</div>
+      </div>
+      <button onclick="openShareWithFamily();dismissShareBanner()" style="background:var(--p-gold,var(--gold));color:#1a1410;border:none;padding:8px 14px;border-radius:999px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0">Share</button>
+      <button onclick="dismissShareBanner(true)" aria-label="Dismiss" style="background:transparent;border:none;color:var(--fg-3);font-size:18px;cursor:pointer;padding:4px 8px;flex-shrink:0">×</button>
+    </div>
+  `;
+  // Insert above the dashboard content
+  const main = document.getElementById('main');
+  const topbar = main.querySelector('.topbar');
+  if(topbar && topbar.nextSibling){
+    main.insertBefore(banner, topbar.nextSibling);
+  }
+}
+function dismissShareBanner(permanent){
+  const el = document.getElementById('shareBanner');
+  if(el)el.remove();
+  if(permanent)lsSet('sharePromptDismissed', 1);
 }
 
 /* ============== MEMBER SWITCHING ============== */
@@ -2247,6 +2646,27 @@ function renderMore(){
     </div>
 
     <div class="stats-card">
+      <div class="stats-card-hd"><h3>Subscriptions · ${fmtMVR(subscriptionsMonthlyTotalMVR())}/mo</h3><span class="more" onclick="openSubscription()" style="font-size:11px;color:var(--p-gold,var(--gold));cursor:pointer;font-weight:600">+ ADD</span></div>
+      ${(state.subscriptions||[]).length===0?`<div class="empty" style="padding:14px 0">No subscriptions yet — Netflix, iCloud, etc.</div>`:state.subscriptions.map(sub=>{
+        const owner = mem(sub.paidBy) || mem(session.currentMember?.id);
+        const nextDate = sub.nextRenewalDate ? new Date(sub.nextRenewalDate) : null;
+        const isPaused = sub.status==='paused';
+        const isCancelled = sub.status==='cancelled';
+        const mvrPerMonth = (sub.frequency==='yearly' ? toMVR(sub.amount,sub.currency)/12 : toMVR(sub.amount,sub.currency));
+        return `<div class="list-row" onclick="openSubscription('${sub.id}')" style="${(isPaused||isCancelled)?'opacity:.55':''}">
+          <div class="list-ic">${sub.icon||'🔁'}</div>
+          <div class="list-body">
+            <div class="list-pri">${escapeHTML(sub.name)}${isPaused?' · paused':''}${isCancelled?' · cancelled':''}</div>
+            <div class="list-sec">${nextDate?'Renews '+nextDate.toLocaleDateString('en',{day:'numeric',month:'short'}):'No schedule'} · ${owner?escapeHTML(owner.name.split(' ')[0]):'—'} · ${sub.frequency||'monthly'}</div>
+          </div>
+          <div class="list-rt" style="text-align:right">
+            <div style="font-family:var(--font-mono);font-weight:600;font-variant-numeric:tabular-nums">${fmtCcy(sub.amount,sub.currency||'MVR')}</div>
+            <div style="font-size:10px;color:var(--fg-3);margin-top:2px">≈${fmtMVR(mvrPerMonth)}/mo</div>
+          </div>
+        </div>`}).join('')}
+    </div>
+
+    <div class="stats-card">
       <div class="stats-card-hd"><h3>Savings · ${fmtMVR(totalSavings())}</h3><span class="more" onclick="openSavings()" style="font-size:11px;color:var(--p-gold,var(--gold));cursor:pointer;font-weight:600">+ ADD</span></div>
       ${state.savings.slice(-5).reverse().map(s=>{const by=mem(s.by);return `<div class="list-row" onclick="openSavings('${s.id}')">
         <div class="list-ic">${s.type==='deposit'?'⬆️':'⬇️'}</div>
@@ -2327,6 +2747,7 @@ function renderMore(){
       <div class="list-row" onclick="go('budget')"><div class="list-ic">🎯</div><div class="list-body"><div class="list-pri">Budgets</div><div class="list-sec">Set monthly spending limits</div></div><div class="list-rt">›</div></div>
       <div class="list-row" onclick="openFamilyLoan()"><div class="list-ic">⇄</div><div class="list-body"><div class="list-pri">Record an IOU</div><div class="list-sec">Track money lent between family</div></div><div class="list-rt">›</div></div>
       ${isHead&&session.mode==='cloud'?`<div class="list-row" onclick="openShareWithFamily()"><div class="list-ic">📤</div><div class="list-body"><div class="list-pri">Share with family</div><div class="list-sec">Give each member access via their own Gmail</div></div><div class="list-rt">›</div></div>`:''}
+      ${session.mode==='cloud'?`<div class="list-row" onclick="openRepairSync()"><div class="list-ic">🔧</div><div class="list-body"><div class="list-pri">Repair sync</div><div class="list-sec">Reconnect to family data or merge duplicate files</div></div><div class="list-rt">›</div></div>`:''}
       <div class="list-row" onclick="openThemePicker()"><div class="list-ic">🎨</div><div class="list-body"><div class="list-pri">Theme &amp; density</div><div class="list-sec">${escapeHTML(PALETTES[theme.palette]?.label||'Midnight')} · ${escapeHTML(theme.density||'regular')} · ${escapeHTML(theme.mood||'bold')}</div></div><div class="list-rt">›</div></div>
       <div class="list-row" onclick="openFx()"><div class="list-ic">💱</div><div class="list-body"><div class="list-pri">Exchange rate</div><div class="list-sec">1 USD = ${state.meta.fxRate||DEFAULT_FX} MVR</div></div><div class="list-rt">›</div></div>
       <div class="list-row" onclick="exportJSON()"><div class="list-ic">📥</div><div class="list-body"><div class="list-pri">Export data (JSON)</div><div class="list-sec">Backup to a file</div></div><div class="list-rt">›</div></div>
@@ -2389,7 +2810,7 @@ $('modalBg').addEventListener('click',e=>{if(e.target.id==='modalBg')closeModal(
 /* ============== TRANSACTION MODAL ============== */
 function openTx(id){
   if(id){const e=state.expenses.find(x=>x.id===id);if(!e)return;txDraft={...e,contributions:e.contributions?{...e.contributions}:{}}}
-  else{txDraft={id:null,date:todayISO(),house:'hiya',category:'Groceries',description:'',paidBy:session.currentMember?.id||state.members[0]?.id,account:state.accounts[0]?.id||'',amount:'',currency:'MVR',type:'expense',note:'',scope:'household',contributions:{}}}
+  else{txDraft={id:null,date:todayISO(),house:'hiya',category:'Groceries',description:'',paidBy:session.currentMember?.id||state.members[0]?.id,account:state.accounts[0]?.id||'',amount:'',currency:'MVR',type:'expense',note:'',scope:'household',contributions:{},photo:null}}
   renderTxModal();
 }
 // Split helpers used by the modal
@@ -2438,8 +2859,32 @@ function renderTxModal(){
     ${t.id?'':`
     <div class="nlp-box">
       <div class="nlp-lab">✨ Smart add</div>
-      <textarea id="nlpInput" class="nlp-input" placeholder='Type naturally:&#10;"coffee with friends 50 rf"&#10;"stelco 1240"&#10;"villaggio groceries 850"'></textarea>
-      <div class="nlp-foot"><span class="nlp-hint">Or paste a BML SMS</span><button class="nlp-btn" onclick="nlpParseAndFill()">Parse →</button></div>
+      <div class="nlp-tabs">
+        <button class="nlp-tab ${(session.smartTab||'type')==='type'?'act':''}" onclick="session.smartTab='type';renderTxModal()">⌨️ Type / Paste</button>
+        <button class="nlp-tab ${session.smartTab==='photo'?'act':''}" onclick="session.smartTab='photo';renderTxModal()">📸 Photo</button>
+      </div>
+      ${(session.smartTab||'type')==='type' ? `
+        <textarea id="nlpInput" class="nlp-input" placeholder='Type naturally or paste a bank SMS:&#10;"coffee 50"&#10;BML: "Transaction from 6906 ... MVR262.00 at IHSAAN FIHAARA 3"&#10;MIB: "Your POS PURCHASE from ***8404 for 154.07 MVR at SEMYS MART"'></textarea>
+        <div class="nlp-foot"><span class="nlp-hint">BML & MIB SMS supported</span><button class="nlp-btn" onclick="nlpParseAndFill()">Parse →</button></div>
+      ` : `
+        <div class="photo-zone" id="photoZone">
+          ${txDraft.photo ? `
+            <div class="photo-preview"><img src="${txDraft.photo}" alt="receipt"/></div>
+            <div class="nlp-foot">
+              <span class="nlp-hint" id="ocrStatus">${session.ocrText?'Text extracted ✓':'Tap "Read" to scan'}</span>
+              <button class="nlp-btn" onclick="runOcrOnPhoto()">${session.ocrText?'Parse →':'Read'}</button>
+            </div>
+            <button class="ghost-btn" style="margin-top:8px;font-size:11px" onclick="txDraft.photo=null;session.ocrText='';renderTxModal()">Remove photo</button>
+          ` : `
+            <label class="photo-pick">
+              <input type="file" accept="image/*" capture="environment" style="display:none" onchange="onPhotoPicked(this)">
+              <div class="photo-pick-ic">📸</div>
+              <div class="photo-pick-lab">Snap or upload receipt</div>
+              <div class="photo-pick-sub">SMS screenshot or bank statement works too</div>
+            </label>
+          `}
+        </div>
+      `}
     </div>`}
 
     <div class="seg" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
@@ -2482,12 +2927,9 @@ function renderTxModal(){
 
     <div class="f-group">
       <div class="f-lab">Paid by</div>
-      <div class="mem-pick">
-        ${state.members.map(m=>`<button class="${m.id===t.paidBy?'act':''}" onclick="txDraft.paidBy='${m.id}';renderTxModal()">
-          <span class="av">${memInitial(m.name)}</span>
-          <span class="nm">${escapeHTML(m.name.split(' ')[0])}</span>
-        </button>`).join('')}
-      </div>
+      <select class="mem-select" onchange="txDraft.paidBy=this.value;renderTxModal()">
+        ${state.members.map(m=>`<option value="${m.id}" ${m.id===t.paidBy?'selected':''}>${escapeHTML(m.name)}${m.id===session.currentMember?.id?' (you)':''}${m.role?' · '+escapeHTML(m.role):''}</option>`).join('')}
+      </select>
     </div>
 
     ${isHousehold&&t.type==='expense'?`<div class="f-group">
@@ -2539,84 +2981,323 @@ function renderTxModal(){
   `);
 }
 
-/* ============== NATURAL LANGUAGE PARSER ============== */
+/* ============== UNIFIED SMART PARSER ============== */
+/* Handles:
+   - BML SMS (e.g. "Transaction from 6906 on 04/05/26 at 20:37:01 for MVR262.00 at IHSAAN FIHAARA 3 was processed. Reference No:612415784440, Approval Code:784440.")
+   - MIB SMS: POS PURCHASE / E-COMMERCE TRX / Favara Transfer
+   - Natural language ("coffee 250", "wifi bill 745.21 from cash")
+*/
 function nlpParseAndFill(){
   const text=($('nlpInput')?.value||'').trim();
   if(!text){toast('Type something first');return}
-  // If looks like a BML SMS, use the BML parser path
-  if(/\bMVR\s*[\d,.]+/i.test(text) && /\b(debited|credited|a\/?c|balance|ref)\b/i.test(text)){
-    const bml=parseBmlText(text);
-    if(bml && bml.amount>0){
-      txDraft.amount=bml.amount;
-      if(bml.type==='credit')txDraft.type='income';
-      if(bml.account)txDraft.description=`BML ${bml.account}${bml.ref?' ref '+bml.ref:''}`;
-      if(bml.merchant)txDraft.description=bml.merchant;
-      // try to match account by last-4
-      if(bml.account){const a=state.accounts.find(x=>x.number&&(x.number.includes(bml.account.slice(-4))||bml.account.includes((x.number||'').slice(-4))));if(a){txDraft.account=a.id;txDraft.currency=a.currency}}
-      renderTxModal();
-      toast('Parsed BML ✓');
-      return;
+  let parsed = null;
+  // Try BML format first
+  if(/Transaction\s+from\s+\d{3,5}/i.test(text) || /\bReference\s*No\b/i.test(text)){
+    parsed = parseBmlSms(text);
+  }
+  // Try MIB format
+  if(!parsed && /POS\s+PURCHASE|E-COMMERCE\s+TRX|Favara\s+Transfer/i.test(text)){
+    parsed = parseMibSms(text);
+  }
+  // Fallback to plain natural-language
+  if(!parsed){
+    parsed = parseNL(text);
+  }
+  // Apply to draft
+  Object.assign(txDraft, parsed);
+  // Duplicate detection by reference number
+  if(parsed.ref){
+    const dup = state.expenses.find(e=>e.note && e.note.includes('Ref:'+parsed.ref));
+    if(dup){
+      if(!confirm(`Looks like this was already added (Ref ${parsed.ref}). Add anyway?`))return;
     }
   }
-  // Plain natural language
-  const r=parseNL(text);
-  Object.assign(txDraft,r);
   renderTxModal();
-  toast('Parsed ✓');
+  toast((parsed.source||'Parsed')+' ✓');
 }
+
+/* === PHOTO + OCR === */
+function onPhotoPicked(input){
+  const file = input.files && input.files[0];
+  if(!file)return;
+  // Compress to keep storage small (~50-150KB target)
+  compressImage(file, 1200, 0.78).then(b64=>{
+    txDraft.photo = b64;
+    session.ocrText = '';
+    renderTxModal();
+    // Auto-trigger OCR if Tesseract already loaded
+    setTimeout(()=>runOcrOnPhoto(), 100);
+  }).catch(e=>{
+    console.error(e);
+    toast('Could not load image');
+  });
+}
+function compressImage(file, maxDim, quality){
+  return new Promise((res,rej)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w=img.width, h=img.height;
+        if(w>maxDim||h>maxDim){
+          if(w>h){h=Math.round(h*maxDim/w);w=maxDim}
+          else{w=Math.round(w*maxDim/h);h=maxDim}
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width=w;canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        res(canvas.toDataURL('image/jpeg',quality));
+      };
+      img.onerror = ()=>rej(new Error('Image decode failed'));
+      img.src = e.target.result;
+    };
+    reader.onerror = ()=>rej(new Error('File read failed'));
+    reader.readAsDataURL(file);
+  });
+}
+async function runOcrOnPhoto(){
+  if(!txDraft.photo){toast('Snap a photo first');return}
+  const statusEl = $('ocrStatus');
+  try{
+    if(statusEl)statusEl.textContent = 'Loading OCR engine…';
+    const Tesseract = await window.__tesseractLoader();
+    if(statusEl)statusEl.textContent = 'Reading text… (5-15s)';
+    const { data } = await Tesseract.recognize(txDraft.photo, 'eng');
+    const text = (data && data.text || '').trim();
+    session.ocrText = text;
+    if(!text){toast('No text found');if(statusEl)statusEl.textContent='No text found';return}
+    // Run the unified parser on the OCR text
+    let parsed = null;
+    if(/Transaction\s+from\s+\d{3,5}/i.test(text) || /\bReference\s*No\b/i.test(text)){
+      parsed = parseBmlSms(text);
+    }
+    if(!parsed && /POS\s+PURCHASE|E-COMMERCE\s+TRX|Favara\s+Transfer/i.test(text)){
+      parsed = parseMibSms(text);
+    }
+    if(!parsed){parsed = parseNL(text)}
+    Object.assign(txDraft, parsed);
+    // dup check
+    if(parsed.ref){
+      const dup = state.expenses.find(e=>e.note && e.note.includes('Ref:'+parsed.ref));
+      if(dup && !confirm(`Looks like this was already added (Ref ${parsed.ref}). Add anyway?`))return;
+    }
+    renderTxModal();
+    toast('Photo parsed ✓');
+  }catch(e){
+    console.error(e);
+    toast('OCR failed — try a clearer photo');
+    if(statusEl)statusEl.textContent='OCR failed';
+  }
+}
+
+/* BML SMS parser — handles real format:
+   "Transaction from 6906 on 04/05/26 at 20:37:01 for MVR262.00 at IHSAAN FIHAARA 3 was processed.
+    Reference No:612415784440, Approval Code:784440."
+   Also legacy "MVR 250.00 debited from a/c XX1234..."
+*/
+function parseBmlSms(t){
+  const out = {type:'expense', currency:'MVR', source:'BML SMS'};
+  // Amount + currency
+  const amMatch = t.match(/(MVR|USD)\s*([\d,]+(?:\.\d{1,2})?)/i);
+  if(!amMatch)return null;
+  out.currency = amMatch[1].toUpperCase();
+  out.amount = +amMatch[2].replace(/,/g,'');
+  // Account: "Transaction from 6906" — last-4 digits
+  const accMatch = t.match(/(?:Transaction\s+from|a\/c|account|from)\s+\**(\d{3,5})/i);
+  if(accMatch)out.accountLast4 = accMatch[1];
+  // Merchant: "at IHSAAN FIHAARA 3 was processed"
+  const mMatch = t.match(/\bat\s+([A-Z0-9][A-Z0-9 &'.\-]{2,60}?)(?:\s+was\s+processed|\.|\s*Reference|\s*Ref|\s*$)/i);
+  if(mMatch)out.merchant = cleanMerchant(mMatch[1]);
+  // Reference
+  const refMatch = t.match(/Reference\s*No\.?:?\s*(\d+)/i) || t.match(/Ref[\s:.]+(\S+)/i);
+  if(refMatch)out.ref = refMatch[1];
+  // Type: credit/debit
+  if(/credit(?:ed)?|received|deposit|salary/i.test(t))out.type='income';
+  // Category + cleaned description
+  out.description = out.merchant || 'BML transaction';
+  out.category = categorizeFromMerchant(out.merchant||'', t);
+  out.note = (out.ref?`BML · Ref:${out.ref}`:'BML SMS');
+  // Account match
+  if(out.accountLast4){
+    const m = state.accounts.find(a=>a.number && a.number.replace(/\D/g,'').endsWith(out.accountLast4));
+    if(m){out.account=m.id;out.currency=m.currency||out.currency}
+  }
+  return out;
+}
+
+/* MIB SMS parser — three formats:
+   1. POS PURCHASE: "Your POS PURCHASE from ***8404 for 154.07 MVR at SEMYS MART H11, MV on 11.05.26 15:05"
+   2. E-COMMERCE TRX: "Your E-COMMERCE TRX from ***8404 for 646.92 MVR at Ooredoo Maldives PLC"
+   3. Favara Transfer: "Favara Transfer to your account 90103***21000 for MVR 1000.00" (incoming)
+                       "Favara Transfer from your account ... for MVR ..."  (outgoing)
+*/
+function parseMibSms(t){
+  const out = {type:'expense', currency:'MVR', source:'MIB SMS'};
+  // POS PURCHASE / E-COMMERCE TRX
+  let m = t.match(/Your\s+(POS\s+PURCHASE|E-COMMERCE\s+TRX)\s+from\s+\*+(\d{3,5})\s+for\s+([\d,]+(?:\.\d{1,2})?)\s*(MVR|USD)\s+at\s+([A-Za-z0-9][A-Za-z0-9 &'.\-,]{1,80}?)(?:\s+on\s+|\s*$|\.)/i);
+  if(m){
+    out.txType = m[1].toUpperCase();
+    out.accountLast4 = m[2];
+    out.amount = +m[3].replace(/,/g,'');
+    out.currency = m[4].toUpperCase();
+    out.merchant = cleanMerchant(m[5]);
+    out.description = out.merchant;
+    out.category = categorizeFromMerchant(out.merchant||'', t);
+    out.note = `MIB · ${out.txType}`;
+    if(out.accountLast4){
+      const a = state.accounts.find(a=>a.number && a.number.replace(/\D/g,'').endsWith(out.accountLast4));
+      if(a){out.account=a.id;out.currency=a.currency||out.currency}
+    }
+    return out;
+  }
+  // Favara Transfer (incoming/outgoing)
+  m = t.match(/Favara\s+Transfer\s+(to|from)\s+your\s+account\s+([0-9*]+)\s+for\s+(MVR|USD)\s*([\d,]+(?:\.\d{1,2})?)/i);
+  if(m){
+    const direction = m[1].toLowerCase();
+    out.type = direction==='to' ? 'income' : 'expense';
+    out.accountFull = m[2];
+    out.currency = m[3].toUpperCase();
+    out.amount = +m[4].replace(/,/g,'');
+    out.description = direction==='to' ? 'Transfer received' : 'Transfer sent';
+    out.category = direction==='to' ? 'Salary' : 'Other';
+    out.note = 'MIB · Favara';
+    // try to match account by last digits
+    const last4 = (m[2].replace(/\D/g,'').slice(-4));
+    if(last4){
+      const a = state.accounts.find(a=>a.number && a.number.replace(/\D/g,'').endsWith(last4));
+      if(a){out.account=a.id;out.currency=a.currency||out.currency}
+    }
+    return out;
+  }
+  return null;
+}
+
+/* Clean merchant: title-case, strip trailing numbers, normalize */
+function cleanMerchant(raw){
+  if(!raw)return '';
+  let s = raw.trim().replace(/\s+/g,' ');
+  // Strip trailing ", MV" / ", MALDIVES"
+  s = s.replace(/,\s*(MV|MDV|MALDIVES)$/i,'');
+  // Strip trailing standalone branch numbers like "RAADHA BOOKSHOP 3" → "RAADHA BOOKSHOP"
+  s = s.replace(/\s+\d{1,2}$/,'');
+  // Strip trailing branch codes like "H11", "B-1"
+  s = s.replace(/\s+[A-Z]\d{1,3}$/,'');
+  // Title case (except small words)
+  const small = new Set(['and','of','the','for','in','on','at','a','an','to']);
+  s = s.toLowerCase().split(' ').map((w,i)=>{
+    if(w.length===0)return w;
+    if(i>0 && small.has(w))return w;
+    return w[0].toUpperCase()+w.slice(1);
+  }).join(' ');
+  // Preserve all-caps acronyms (2-4 letters)
+  s = s.replace(/\b([A-Za-z]{2,4})\b/g,(m)=>{
+    const upper = m.toUpperCase();
+    // Keep brand abbreviations uppercase
+    if(/^(BML|MIB|MWSC|STO|FDC|SDFC|HDFC|MPL|SDF|VFC|MTCC|MIFCO|MNU|MIB|USA|USD|MVR|UAE|UK|US|TV|AC|DC|JSC|LLC|LTD|PLC)$/i.test(m))return upper;
+    return m[0].toUpperCase()+m.slice(1).toLowerCase();
+  });
+  return s.trim();
+}
+
+/* Categorize from merchant + raw text */
+function categorizeFromMerchant(merchant, full){
+  const m = (merchant||'').toLowerCase();
+  const t = (full||'').toLowerCase();
+  // Categories must match the CATEGORIES list names exactly
+  const rules = [
+    ['Water',           /mwsc|water/i],
+    ['Electricity',     /stelco|fenaka|electric|power/i],
+    ['Internet',        /ooredoo\s*(maldives|telecom|fiber|fibre|home)?|dhiraagu|raajje\.?\s?online|wifi|internet bill|broadband|fiber|fibre/i],
+    ['Phone',           /mobile bill|recharge|prepaid|airtime/i],
+    ['Groceries',       /fihaara|fihara|mart|grocery|hyper|supermarket|villaggio|fantasy|stop\s?n\s?shop|sonee|stockman|semys|baazaaru|liyu/i],
+    ['Restaurants',     /dine|steak|beach view|t hut|chefbite|ny steak|symphony|seagull|olive garden|sala|seahouse|restaurant/i],
+    ['Coffee',          /coffee|caf[eé]|barista|starbucks|costa|nescafe|kahawa/i],
+    ['Restaurants',     /sushi|pizza|burger|takeaway|takeout|biryani|hedhika|hotel|kitchen|food/i],
+    ['Fuel',            /fuel|petrol|diesel|fpid|stoil|gas station/i],
+    ['Transport',       /taxi|ferry|speedboat|launch|raajje\s?transport|mtcc/i],
+    ['Medical',         /pharmacy|adk|tree top|igmh|hospital|clinic|medical|medicine|drug/i],
+    ['School',          /bookshop|book\s?shop|raadha|school|tuition|education|stationery|al\s?madha/i],
+    ['Clothes',         /clothing|fashion|outfit|shoe|sandal|cotton/i],
+    ['Subscriptions',   /netflix|spotify|youtube\s?premium|icloud|adobe|chatgpt|microsoft\s?365|apple\s?tv|cloud\+/i],
+    ['Maintenance',     /repair|service|maintenance|workshop|garage/i],
+    ['Household',       /detergent|cleaning|tissue|towel|toilet|paper/i],
+    ['Other',           /criss\s?offer/i],
+  ];
+  for(const [cat,re] of rules){
+    if(re.test(m) || re.test(t))return cat;
+  }
+  return 'Other';
+}
+
 function parseNL(text){
-  const out={type:'expense',currency:'MVR',category:'Other',description:'',note:''};
+  const out={type:'expense',currency:'MVR',category:'Other',description:'',note:'',source:'Smart Add'};
   // currency
   if(/\busd\b|\$\s?\d|us\s?dollar/i.test(text))out.currency='USD';
-  // amount: last/first number
+  // amount: prefer the largest plausible number
   const nums=[...text.matchAll(/(?:^|[\s$])(?:mvr|usd|rf|\$)?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\s*(?:mvr|usd|rf|rufiyaa|dollars?)?/gi)];
   if(nums.length){
-    // prefer the largest number that's plausibly an amount
     const cands=nums.map(m=>parseFloat(m[1].replace(/,/g,''))).filter(n=>n>0);
     if(cands.length)out.amount=cands.sort((a,b)=>b-a)[0];
   }
-  // type detection
+  // type
   if(/\b(received|got paid|earned|salary|paycheck|deposit|credit(?:ed)?|paid me|incoming|bonus|refund)\b/i.test(text)){
     out.type='income';out.category='Salary';
   }
   if(/\btransfer(?:red)?\b/i.test(text))out.type='transfer';
-  // category by keyword
-  const kw=[
-    ['Coffee',/\bcoffee|caf[eé]|latte|espresso|barista|cappucc?ino|americano|mocha/i],
-    ['Restaurants',/\brestaurant|dinner|lunch|breakfast|cafe leeks|symphony|seagull|dine|olive garden|sala|seahouse/i],
-    ['Eating Out',/\bsushi|pizza|burger|takeaway|takeout|biryani|hedhika|short eats|hotel\b/i],
-    ['Groceries',/\bgrocery|groceries|stockman|villaggio|fantasy|carrefour|stop ?n ?shop|sonee|store\b|supermarket|hyper|mart/i],
-    ['Fuel',/\bfuel|petrol|diesel|fpid|gas station/i],
-    ['Electricity',/\bstelco|electric|elec\b|power\s?bill/i],
-    ['Water',/\bmwsc|water bill/i],
-    ['Internet/Phone',/\bdhiraagu|ooredoo|internet|wifi|broadband|fiber|mobile bill|recharge|prepaid|raaje\b/i],
-    ['Transport',/\btaxi|ferry|speedboat|bus\b|ride|uber|pickme|launch\b/i],
-    ['Medical',/\bmedical|hospital|pharmacy|adk|tree top|igmh|clinic|doctor|medicine|drug/i],
-    ['School/Education',/\bschool|tuition|education|book|stationery|fee\b/i],
-    ['Clothing',/\bcloth|shirt|dress|shoe|sandal|outfit/i],
-    ['Eating Out',/\beat|food/i], // fallback for "eat" / "food"
-    ['Rent',/\brent\b/i],
-    ['Loan Payment',/\bloan|emi|repayment|installment/i],
-    ['Savings',/\bsaving|save\b/i],
-    ['Maintenance',/\brepair|fix|service|maintenance/i],
-    ['Household Supplies',/\bdetergent|cleaning|tissue|towel|toilet/i],
-    ['Other',/.*/]
-  ];
-  for(const [c,r] of kw)if(r.test(text)){out.category=c;break}
-  // description: clean up the input
+  // category by keyword (extended w/ wifi, internet bill, etc.)
+  out.category = categorizeFromMerchant('', text);
+  // If categorizeFromMerchant said Other, also check the original "Coffee", "Restaurants" etc rules
+  if(out.category==='Other'){
+    const kw=[
+      ['Coffee',/\bcoffee|caf[eé]|latte|espresso|cappucc?ino|americano|mocha/i],
+      ['Restaurants',/\brestaurant|dinner|lunch|breakfast|dine/i],
+      ['Restaurants',/\bsushi|pizza|burger|takeaway|takeout|biryani|hedhika|short eats|hotel\b|food|eat/i],
+      ['Groceries',/\bgrocery|groceries|supermarket|mart|store\b|hyper/i],
+      ['Fuel',/\bfuel|petrol|diesel|gas station/i],
+      ['Electricity',/\bstelco|fenaka|electric|elec\b|power\s?bill/i],
+      ['Water',/\bmwsc|water bill/i],
+      ['Internet',/\bdhiraagu|ooredoo|internet|wifi|broadband|fiber|fibre/i],
+      ['Phone',/\bmobile bill|recharge|prepaid/i],
+      ['Transport',/\btaxi|ferry|speedboat|bus\b|ride|uber|pickme|launch\b/i],
+      ['Medical',/\bmedical|hospital|pharmacy|adk|tree top|igmh|clinic|doctor|medicine|drug/i],
+      ['School',/\bschool|tuition|education|book|stationery|fee\b/i],
+      ['Clothes',/\bcloth|shirt|dress|shoe|sandal|outfit/i],
+      ['Rent',/\brent\b/i],
+      ['Loan Payment',/\bloan|emi|repayment|installment/i],
+      ['Savings',/\bsaving|save\b/i],
+      ['Maintenance',/\brepair|fix|service|maintenance/i],
+      ['Household',/\bdetergent|cleaning|tissue|towel|toilet/i],
+      ['Subscriptions',/\bnetflix|spotify|youtube|icloud|adobe|chatgpt|microsoft 365|apple tv/i],
+    ];
+    for(const [c,r] of kw)if(r.test(text)){out.category=c;break}
+  }
+  // description cleanup
   let desc=text
     .replace(/\b\d+[.,\d]*\s*(?:mvr|usd|rf|rufiyaa|dollars?)?/gi,'')
     .replace(/\$/g,'')
     .replace(/\b(today|yesterday|tomorrow|this morning|tonight|with|my|the|a|an|i|on|at|in|paid|spent|bought|got|went|for|to|of|from)\b/gi,'')
     .replace(/\s+/g,' ').trim();
   if(desc && desc.length>1){
-    // Capitalize first letter
     desc=desc.charAt(0).toUpperCase()+desc.slice(1);
     out.description=desc.split(' ').slice(0,5).join(' ');
   }
-  // note = original input
   if(text.length<140)out.note=text;
   return out;
+}
+
+/* Legacy alias so any older callers still work */
+function parseBmlText(t){
+  const r = parseBmlSms(t);
+  if(!r)return null;
+  return {
+    amount: r.amount,
+    currency: r.currency,
+    account: r.accountLast4 || '',
+    balance: null,
+    ref: r.ref || '',
+    merchant: r.merchant || '',
+    type: r.type==='income' ? 'credit' : 'debit'
+  };
 }
 function saveTx(){
   const t=txDraft;
@@ -2640,6 +3321,7 @@ function saveTx(){
     amount:+t.amount,currency:t.currency,type:t.type,note:t.note||'',scope
   };
   if(contributions)rec.contributions=contributions;
+  if(t.photo)rec.photo=t.photo;
   // update account balance if linked
   const a=acc(rec.account);
   if(a){
@@ -2651,6 +3333,7 @@ function saveTx(){
   }
   if(t.id){const i=state.expenses.findIndex(x=>x.id===t.id);state.expenses[i]=rec}
   else state.expenses.push(rec);
+  session.ocrText='';session.smartTab='type';
   saveState();closeModal();rerenderAll();toast(t.id?'Saved':'Added');
 }
 function deleteTx(){
@@ -2784,6 +3467,233 @@ function saveSav(){
   saveState();closeModal();rerenderAll();toast('Saved');
 }
 function deleteSav(){const i=state.savings.findIndex(x=>x.id===savDraft.id);if(i>=0){state.savings.splice(i,1);saveState();closeModal();rerenderAll();toast('Deleted')}}
+
+/* ============== SUBSCRIPTIONS ============== */
+const SUBSCRIPTION_PRESETS = [
+  {name:'Netflix',          icon:'🎬', amount:9.99,  currency:'USD', frequency:'monthly'},
+  {name:'iCloud+ 50GB',     icon:'📦', amount:0.99,  currency:'USD', frequency:'monthly'},
+  {name:'iCloud+ 200GB',    icon:'📦', amount:2.99,  currency:'USD', frequency:'monthly'},
+  {name:'iCloud+ 2TB',      icon:'📦', amount:9.99,  currency:'USD', frequency:'monthly'},
+  {name:'Spotify Individual',icon:'🎵', amount:9.99, currency:'USD', frequency:'monthly'},
+  {name:'Spotify Family',   icon:'🎵', amount:16.99, currency:'USD', frequency:'monthly'},
+  {name:'Spotify Duo',      icon:'🎵', amount:14.99, currency:'USD', frequency:'monthly'},
+  {name:'YouTube Premium',  icon:'🟣', amount:13.99, currency:'USD', frequency:'monthly'},
+  {name:'Apple TV+',        icon:'📺', amount:9.99,  currency:'USD', frequency:'monthly'},
+  {name:'Adobe Creative Cloud',icon:'🎨',amount:54.99,currency:'USD',frequency:'monthly'},
+  {name:'ChatGPT Plus',     icon:'🤖', amount:20.00, currency:'USD', frequency:'monthly'},
+  {name:'Microsoft 365',    icon:'💼', amount:6.99,  currency:'USD', frequency:'monthly'},
+  {name:'Dhiraagu Fiber',   icon:'📡', amount:899,   currency:'MVR', frequency:'monthly'},
+  {name:'Ooredoo Mobile',   icon:'📱', amount:399,   currency:'MVR', frequency:'monthly'},
+  {name:'Custom',           icon:'🔁', amount:0,     currency:'MVR', frequency:'monthly'},
+];
+
+let subDraft=null;
+function subscriptionsMonthlyTotalMVR(){
+  return (state.subscriptions||[])
+    .filter(s=>s.status!=='paused' && s.status!=='cancelled')
+    .reduce((sum,s)=>{
+      const perMonth = s.frequency==='yearly' ? (+s.amount||0)/12 : (+s.amount||0);
+      return sum + toMVR(perMonth, s.currency||'MVR');
+    },0);
+}
+
+function openSubscription(id){
+  if(id){
+    const sub=(state.subscriptions||[]).find(x=>x.id===id);
+    if(!sub)return;
+    subDraft={...sub, contributions: sub.contributions?{...sub.contributions}:{}};
+  } else {
+    // start with preset picker
+    return openSubscriptionPresetPicker();
+  }
+  renderSubscriptionModal();
+}
+function openSubscriptionPresetPicker(){
+  openModal(`
+    <div class="modal-hd"><h3>Pick a subscription</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div style="font-size:11px;color:var(--fg-3);margin-bottom:14px">Tap one to start. You can edit details next.</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-height:380px;overflow-y:auto;padding-right:4px">
+      ${SUBSCRIPTION_PRESETS.map(p=>`
+        <div onclick="pickSubscriptionPreset(${JSON.stringify(p).replace(/"/g,'&quot;')})"
+          style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:14px 8px;text-align:center;cursor:pointer;transition:background .15s">
+          <div style="font-size:26px;line-height:1;margin-bottom:6px">${p.icon}</div>
+          <div style="font-size:11.5px;font-weight:600;color:var(--fg);margin-bottom:2px">${escapeHTML(p.name)}</div>
+          <div style="font-size:10px;color:var(--fg-3);font-family:var(--font-mono)">${p.amount>0?fmtCcy(p.amount,p.currency):'Custom'}</div>
+        </div>
+      `).join('')}
+    </div>
+  `);
+}
+function pickSubscriptionPreset(preset){
+  const today = new Date();
+  const renewalDay = today.getDate();
+  // Next renewal: same day next month
+  const next = new Date(today);
+  next.setMonth(next.getMonth()+1);
+  subDraft = {
+    id: null,
+    name: preset.name==='Custom' ? '' : preset.name,
+    icon: preset.icon,
+    amount: preset.amount,
+    currency: preset.currency,
+    frequency: preset.frequency,
+    renewalDay: renewalDay,
+    nextRenewalDate: next.toISOString().slice(0,10),
+    scope: 'household',
+    house: session.currentMember?.livesIn || 'hiya',
+    paidBy: session.currentMember?.id || state.members[0]?.id,
+    contributions: {},
+    status: 'active',
+    lastChargedOn: '',
+  };
+  renderSubscriptionModal();
+}
+function renderSubscriptionModal(){
+  const s = subDraft;
+  const isHousehold = s.scope==='household';
+  const splitOn = isHousehold && s.contributions && Object.keys(s.contributions).length>0;
+  openModal(`
+    <div class="modal-hd"><h3>${s.id?'Edit subscription':'New subscription'}</h3><span class="modal-close" onclick="closeModal()">×</span></div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+      <input value="${escapeHTML(s.icon||'🔁')}" maxlength="2" oninput="subDraft.icon=this.value;renderSubscriptionModal()" style="width:54px;height:54px;text-align:center;font-size:28px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px">
+      <input value="${escapeHTML(s.name||'')}" placeholder="Subscription name" oninput="subDraft.name=this.value" style="flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:14px;color:var(--fg);font-size:15px;font-weight:600">
+    </div>
+
+    <div class="big-amt" style="margin-bottom:14px">
+      <div class="row">
+        <select onchange="subDraft.currency=this.value;renderSubscriptionModal()" style="background:transparent;border:none;color:var(--fg-2);font-size:14px;margin-right:6px">
+          <option value="MVR" ${s.currency==='MVR'?'selected':''}>MVR</option>
+          <option value="USD" ${s.currency==='USD'?'selected':''}>USD</option>
+        </select>
+        <input type="number" step="0.01" value="${s.amount||''}" placeholder="0.00" oninput="subDraft.amount=+this.value||0" style="width:${Math.max(120,String(s.amount||'').length*36+40)}px">
+      </div>
+    </div>
+
+    <div class="seg" style="margin-bottom:14px">
+      <button class="${s.frequency==='monthly'?'act':''}" onclick="subDraft.frequency='monthly';renderSubscriptionModal()">Monthly</button>
+      <button class="${s.frequency==='yearly'?'act':''}" onclick="subDraft.frequency='yearly';renderSubscriptionModal()">Yearly</button>
+    </div>
+
+    <div class="seg" style="grid-template-columns:1fr 1fr;margin-bottom:14px">
+      <button class="${isHousehold?'act':''}" onclick="subDraft.scope='household';renderSubscriptionModal()">🏠 Household</button>
+      <button class="${!isHousehold?'act':''}" onclick="subDraft.scope='personal';subDraft.contributions={};renderSubscriptionModal()">👤 Personal</button>
+    </div>
+
+    ${isHousehold?`<div class="f-group">
+      <div class="f-lab">House</div>
+      <div class="seg" style="grid-template-columns:1fr 1fr">
+        <button class="${s.house==='hiya'?'act':''}" onclick="subDraft.house='hiya';renderSubscriptionModal()">🏢 Hiya</button>
+        <button class="${s.house==='vidhuvaru'?'act':''}" onclick="subDraft.house='vidhuvaru';renderSubscriptionModal()">🌴 Vidhuvaru</button>
+      </div>
+    </div>`:''}
+
+    <div class="f-group">
+      <div class="f-lab">Paid by</div>
+      <select class="mem-select" onchange="subDraft.paidBy=this.value;renderSubscriptionModal()">
+        ${state.members.map(m=>`<option value="${m.id}" ${m.id===s.paidBy?'selected':''}>${escapeHTML(m.name)}${m.id===session.currentMember?.id?' (you)':''}</option>`).join('')}
+      </select>
+    </div>
+
+    <div class="grid-2">
+      <div class="field"><label>Renewal day</label>
+        <input type="number" min="1" max="31" value="${s.renewalDay||1}" oninput="subDraft.renewalDay=Math.max(1,Math.min(31,+this.value||1))">
+      </div>
+      <div class="field"><label>Next renewal</label>
+        <input type="date" value="${s.nextRenewalDate||todayISO()}" oninput="subDraft.nextRenewalDate=this.value">
+      </div>
+    </div>
+
+    <div class="f-group">
+      <div class="f-lab">Status</div>
+      <div class="seg" style="grid-template-columns:1fr 1fr 1fr">
+        <button class="${(s.status||'active')==='active'?'act':''}" onclick="subDraft.status='active';renderSubscriptionModal()">Active</button>
+        <button class="${s.status==='paused'?'act':''}" onclick="subDraft.status='paused';renderSubscriptionModal()">Paused</button>
+        <button class="${s.status==='cancelled'?'act':''}" onclick="subDraft.status='cancelled';renderSubscriptionModal()">Cancelled</button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      ${s.id?`<button class="danger-btn" style="margin:0" onclick="deleteSubscription()">Delete</button>`:''}
+      <button class="secondary-btn" onclick="closeModal()">Cancel</button>
+      <button class="primary-btn" onclick="saveSubscription()">${s.id?'Save':'Add'}</button>
+    </div>
+  `);
+}
+function saveSubscription(){
+  const s = subDraft;
+  if(!s.name||!s.name.trim()){toast('Enter a name');return}
+  if(!s.amount||+s.amount<=0){toast('Enter amount');return}
+  if(!s.paidBy){toast('Pick who pays');return}
+  // Compute nextRenewalDate if missing
+  if(!s.nextRenewalDate){
+    const t=new Date();const next=new Date(t.getFullYear(),t.getMonth()+1,Math.min(s.renewalDay||1,28));
+    s.nextRenewalDate=next.toISOString().slice(0,10);
+  }
+  if(!Array.isArray(state.subscriptions))state.subscriptions=[];
+  if(s.id){
+    const i=state.subscriptions.findIndex(x=>x.id===s.id);
+    state.subscriptions[i]={...state.subscriptions[i],...s};
+  }else{
+    state.subscriptions.push({...s,id:uid('sub')});
+  }
+  saveState();closeModal();rerenderAll();toast(s.id?'Saved':'Added');
+}
+function deleteSubscription(){
+  if(!confirm('Delete this subscription?'))return;
+  const i=state.subscriptions.findIndex(x=>x.id===subDraft.id);
+  if(i>=0){state.subscriptions.splice(i,1);saveState();closeModal();rerenderAll();toast('Deleted')}
+}
+
+/* Check on every app open: any subscriptions due today/past-due → auto-create an expense */
+function checkSubscriptionRenewals(){
+  const subs = state.subscriptions||[];
+  if(!subs.length)return;
+  const today = todayISO();
+  let created = 0;
+  for(const sub of subs){
+    if(sub.status==='paused'||sub.status==='cancelled')continue;
+    if(!sub.nextRenewalDate)continue;
+    // Process all past-due renewals (in case the user didn't open the app for days)
+    let safety = 24; // never loop more than 24 cycles to be safe
+    while(sub.nextRenewalDate <= today && safety-- > 0){
+      // Has this renewal already been recorded?
+      const existingId = `subrenew:${sub.id}:${sub.nextRenewalDate}`;
+      const alreadyExists = state.expenses.some(e=>e.note===existingId);
+      if(!alreadyExists){
+        const rec = {
+          id: uid('e'),
+          date: sub.nextRenewalDate,
+          house: sub.scope==='personal' ? 'both' : (sub.house||'hiya'),
+          category: 'Subscriptions',
+          description: sub.name,
+          paidBy: sub.paidBy,
+          account: '',
+          amount: +sub.amount,
+          currency: sub.currency||'MVR',
+          type: 'expense',
+          note: existingId,
+          scope: sub.scope||'household',
+        };
+        if(sub.scope==='household' && sub.contributions && Object.keys(sub.contributions).length>0){
+          rec.contributions = {...sub.contributions};
+        }
+        state.expenses.push(rec);
+        created++;
+      }
+      // Advance nextRenewalDate
+      const d = new Date(sub.nextRenewalDate);
+      if(sub.frequency==='yearly')d.setFullYear(d.getFullYear()+1);
+      else d.setMonth(d.getMonth()+1);
+      sub.nextRenewalDate = d.toISOString().slice(0,10);
+      sub.lastChargedOn = today;
+    }
+  }
+  if(created>0){
+    saveState();
+    toast(`Auto-added ${created} subscription renewal${created>1?'s':''}`);
+  }
+}
+
 
 /* ============== THEME PICKER MODAL ============== */
 function openThemePicker(){
@@ -2936,19 +3846,15 @@ function renderFamilyLoanModal(){
     </div>
     <div class="f-group">
       <div class="f-lab">Lender (who gave)</div>
-      <div class="mem-pick">
-        ${state.members.map(m=>`<button class="${m.id===l.lender?'act':''}" onclick="famLoanDraft.lender='${m.id}';renderFamilyLoanModal()">
-          <span class="av">${memInitial(m.name)}</span><span class="nm">${escapeHTML(m.name.split(' ')[0])}</span>
-        </button>`).join('')}
-      </div>
+      <select class="mem-select" onchange="famLoanDraft.lender=this.value;renderFamilyLoanModal()">
+        ${state.members.map(m=>`<option value="${m.id}" ${m.id===l.lender?'selected':''}>${escapeHTML(m.name)}${m.id===session.currentMember?.id?' (you)':''}</option>`).join('')}
+      </select>
     </div>
     <div class="f-group">
       <div class="f-lab">Borrower (who received)</div>
-      <div class="mem-pick">
-        ${state.members.filter(m=>m.id!==l.lender).map(m=>`<button class="${m.id===l.borrower?'act':''}" onclick="famLoanDraft.borrower='${m.id}';renderFamilyLoanModal()">
-          <span class="av">${memInitial(m.name)}</span><span class="nm">${escapeHTML(m.name.split(' ')[0])}</span>
-        </button>`).join('')}
-      </div>
+      <select class="mem-select" onchange="famLoanDraft.borrower=this.value;renderFamilyLoanModal()">
+        ${state.members.filter(m=>m.id!==l.lender).map(m=>`<option value="${m.id}" ${m.id===l.borrower?'selected':''}>${escapeHTML(m.name)}${m.id===session.currentMember?.id?' (you)':''}</option>`).join('')}
+      </select>
     </div>
     <div class="grid-2">
       <div class="field"><label>Date</label><input type="date" value="${l.date}" oninput="famLoanDraft.date=this.value"></div>
@@ -3199,84 +4105,9 @@ function openFx(){
 }
 function saveFx(){state.meta.fxRate=+$('fxV').value||DEFAULT_FX;saveState();closeModal();rerenderAll();toast('Saved')}
 
-/* ============== BML IMPORT ============== */
-function openBml(){
-  openModal(`
-    <div class="modal-hd"><h3>Import BML notification</h3><span class="modal-close" onclick="closeModal()">×</span></div>
-    <p style="color:var(--muted);font-size:12px;margin-bottom:10px">Paste the BML SMS or notification text. We'll parse the amount and account.</p>
-    <textarea id="bmlText" class="bml-input" placeholder="BML: MVR 250.00 debited from a/c XX1234..." oninput="bmlParse()"></textarea>
-    <div id="bmlParsed"></div>
-    <div class="modal-actions">
-      <button class="secondary-btn" onclick="closeModal()">Cancel</button>
-      <button class="primary-btn" id="bmlGo" onclick="bmlImport()" disabled style="opacity:.5">Import</button>
-    </div>
-  `);
-}
-let bmlData=null;
-function parseBmlText(t){
-  if(!t||!t.trim())return null;
-  const cur=/USD\s*([\d,]+\.?\d*)/i.test(t)?'USD':'MVR';
-  const am=t.match(/(?:MVR|USD)\s*([\d,]+\.?\d*)/i);
-  const amount=am?+am[1].replace(/,/g,''):0;
-  const acm=t.match(/(?:a\/c|account)\s*([A-Z0-9*]+)/i);
-  const account=acm?acm[1]:'';
-  const balm=t.match(/balance[:\s]+(?:MVR|USD)?\s*([\d,]+\.?\d*)/i);
-  const balance=balm?+balm[1].replace(/,/g,''):null;
-  const refm=t.match(/Ref[\.\s:]*\s*(?:no\.?\s*)?(\S+)/i);
-  const ref=refm?refm[1]:'';
-  const isDebit=/debit|debited|withdrawal|paid|purchase|transfer from/i.test(t);
-  const isCredit=/credit|credited|deposit|received|salary|transfer to/i.test(t);
-  // try to extract a merchant name (e.g. "at STOCKMAN")
-  const mm=t.match(/(?:at|to|from)\s+([A-Z][A-Z0-9 &'-]{2,40}?)(?=[.,\s]|$)/);
-  const merchant=mm?mm[1].trim().replace(/\s+/g,' '):'';
-  return {amount,currency:cur,account,balance,ref,merchant,type:isCredit&&!isDebit?'credit':'debit'};
-}
-function bmlParse(){
-  const t=$('bmlText').value;
-  if(!t.trim()){$('bmlParsed').innerHTML='';$('bmlGo').disabled=true;$('bmlGo').style.opacity=.5;bmlData=null;return}
-  const cur=/USD\s*([\d,]+\.?\d*)/i.test(t)?'USD':/MVR\s*([\d,]+\.?\d*)/i.test(t)?'MVR':'MVR';
-  const am=t.match(/(?:MVR|USD)\s*([\d,]+\.?\d*)/i);
-  const amount=am?+am[1].replace(/,/g,''):0;
-  const acm=t.match(/(?:a\/c|account)\s*([A-Z0-9]+)/i);
-  const accNum=acm?acm[1]:'';
-  const balm=t.match(/balance[:\s]+(?:MVR|USD)\s*([\d,]+\.?\d*)/i);
-  const balance=balm?+balm[1].replace(/,/g,''):null;
-  const refm=t.match(/Ref[:\s]+(\S+)/i);
-  const ref=refm?refm[1]:'';
-  const isDebit=/debit|debited|withdrawal|paid|purchase/i.test(t);
-  const isCredit=/credit|credited|deposit|received|salary/i.test(t);
-  bmlData={amount,currency:cur,accountNumber:accNum,balance,ref,type:isCredit&&!isDebit?'income':'expense'};
-  // try to find matching account
-  const matched=state.accounts.find(a=>a.number&&accNum.endsWith(a.number.replace(/\D/g,'').slice(-4)));
-  bmlData.matchedAccount=matched;
-  $('bmlParsed').innerHTML=`<div class="bml-parsed">
-    <div class="ttl">Parsed successfully</div>
-    <div class="field-row"><span class="l">Amount</span><span class="v">${cur} ${fmtNum(amount)}</span></div>
-    <div class="field-row"><span class="l">Type</span><span class="v">${bmlData.type==='income'?'Credit (income)':'Debit (expense)'}</span></div>
-    ${accNum?`<div class="field-row"><span class="l">Account</span><span class="v">${escapeHTML(accNum)}${matched?' ✓ '+escapeHTML(matched.name):' (no match — will pick one)'}</span></div>`:''}
-    ${balance!==null?`<div class="field-row"><span class="l">New balance</span><span class="v">${cur} ${fmtNum(balance)}</span></div>`:''}
-    ${ref?`<div class="field-row"><span class="l">Reference</span><span class="v">${escapeHTML(ref)}</span></div>`:''}
-  </div>`;
-  $('bmlGo').disabled=false;$('bmlGo').style.opacity=1;
-}
-function bmlImport(){
-  if(!bmlData||!bmlData.amount){toast('Nothing to import');return}
-  // close BML modal & open Tx modal pre-filled
-  txDraft={
-    id:null,date:todayISO(),
-    house:session.currentMember?.livesIn||'hiya',
-    category:bmlData.type==='income'?'Salary':'Other',
-    description:bmlData.ref?'BML '+bmlData.ref:'BML transaction',
-    paidBy:session.currentMember?.id||state.members[0]?.id,
-    account:bmlData.matchedAccount?bmlData.matchedAccount.id:(state.accounts[0]?.id||''),
-    amount:bmlData.amount,currency:bmlData.currency,type:bmlData.type,note:'Imported from BML'
-  };
-  // sync account balance if we got one and matched
-  if(bmlData.matchedAccount && bmlData.balance!==null){
-    bmlData.matchedAccount.balance=bmlData.balance;
-  }
-  renderTxModal();
-}
+/* ============== BML IMPORT (legacy modal removed in v4.9 — now merged into Smart Add) ============== */
+/* The old openBml() / bmlParse() / bmlImport() functions have been removed.
+   All BML/MIB parsing now flows through nlpParseAndFill() in the New Entry modal's Smart Add box. */
 
 /* ============== EXPORT / RESET ============== */
 function exportJSON(){
